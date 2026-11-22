@@ -1,4 +1,4 @@
-const SITE_ORIGIN = "https://mtube-test.pages.dev";
+const SITE_ORIGIN = "https://cloude-test.pages.dev";
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 const STORYBOARD_QUERY_KEYS = new Set(["sigh", "sqp"]);
 const INVIDIOUS_HOSTS = [
