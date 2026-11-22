@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'; style-src 'self'; img-src 'self'; font-src 'self'; manifest-src 'self'">
+<link rel="stylesheet" href="./style.css?v=71">
+<title>Privacy Notice — MTube</title>
+</head>
+<body>
+<main id="setup">
+  <header id="top"><div id="brand" role="img" aria-label="MTube"><div class="logo" aria-hidden="true"><span>M</span></div><span>Tube</span></div></header>
+  <section class="link-entry">
+    <h1>Privacy notice</h1>
+    <p>Last updated: November 22, 2026</p>
+    <p>MTube is a static website plus a small Cloudflare Worker that relays selected public requests. It has no accounts, no analytics, no advertising code, no cookies of its own and no server-side database of what you watch.</p>
+
+    <h2>What is stored on your device</h2>
+    <p>Watch history, playback position, cached video titles and your settings live in this browser's local storage only. The app does not encrypt them, so anyone who can use or inspect the same browser profile can read them. History expires by itself: entries older than 90 days are erased, and at most 500 entries are kept. “Clear my history” erases history, the feed cache and saved titles immediately.</p>
+    <p>The personalized “For you” feed is <strong>off by default</strong>. While it is off, the search phrases used to fill the home page are generic topics. If you switch it on, short phrases made from titles you watched are sent through the relay to a public provider. Private mode stops saving history and stops all history-based phrases; it does not delete what is already saved and does not make you anonymous.</p>
+
+    <h2>What leaves your device</h2>
+    <p>Your browser talks to this website only. It never contacts a search or metadata provider itself. Search phrases, autocomplete text, video IDs and thumbnail requests go to this site's Cloudflare Worker, which forwards them to public community services (Piped for search and video details, Invidious and YouTube as fallbacks for timeline preview data).</p>
+    <ul>
+      <li>The Worker builds every outgoing request from scratch. Your cookies, IP address, browser identity and referrer are not forwarded; the provider sees the Worker's network address and the phrase or video ID, nothing else.</li>
+      <li>A request is sent to one provider first. A second provider is asked only if the first fails or stays silent for a moment. A request is never broadcast to the whole provider list, and a provider that is unreachable never receives it. As a hard limit, at most five providers can ever see one phrase.</li>
+      <li>Timeline preview data normally comes from the details the first provider already returned, so no further provider learns which video you are watching. Only when those details are missing is another provider asked, one at a time.</li>
+      <li>Providers are independent operators. They may keep their own logs; MTube cannot control that.</li>
+    </ul>
+    <p>Cloudflare, which hosts this site, receives your IP address and request metadata when your browser connects, and processes it under its own terms. For abuse protection the Worker keeps a short-lived in-memory counter keyed by your connection address; it is never written to disk, logged or sent to a provider.</p>
+
+    <h2>Images and playback</h2>
+    <p>Video thumbnails are fetched through the Worker. Timeline preview sheets load directly from YouTube's image servers (ytimg.com). Playback uses YouTube's own embedded player at www.youtube.com, in a sandboxed frame. YouTube therefore sees your IP address, the video you watch and normal playback and browser information, under Google's privacy policy. MTube cannot hide this and cannot remove advertising that YouTube's player chooses to show.</p>
+
+    <h2>Third parties</h2>
+    <p>Cloudflare (hosting and relay), the public Piped and Invidious instances the Worker uses, and YouTube/Google (playback and images). Their own policies apply to their services.</p>
+
+    <h2>Children and accounts</h2>
+    <p>This build has no account creation, sign-in or payments.</p>
+
+    <h2>Questions</h2>
+    <p>For privacy questions, contact the repository owner through the GitHub profile. Do not post personal or sensitive information in a public issue.</p>
+    <p><a class="privacy-link" href="./index.html">Return to MTube</a></p>
+  </section>
+</main>
+</body>
+</html>

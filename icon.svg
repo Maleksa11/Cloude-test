@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MTube">
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ed233f"/>
+      <stop offset="1" stop-color="#b90e2d"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0d0e11"/>
+  <rect x="28" y="28" width="456" height="456" rx="104" fill="url(#brand)"/>
+  <path d="M112 360V152h62l82 112 82-112h62v208h-65V255l-79 102-79-102v105z" fill="#fff"/>
+</svg>

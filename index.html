@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self' https://*.ytimg.com; font-src 'self'; frame-src https://www.youtube.com; connect-src 'self'; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; upgrade-insecure-requests; require-trusted-types-for 'script'; trusted-types mtube-sw">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MTube">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0d10">
+<meta name="description" content="MTube — a calmer, more personal place to discover and watch videos.">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<title>MTube</title>
+<link rel="stylesheet" href="./style.css?v=71">
+</head>
+<body>
+<main id="setup">
+  <header id="top">
+    <div id="brand" role="img" aria-label="MTube"><div class="logo" aria-hidden="true"><span>M</span></div><span>Tube</span></div>
+  </header>
+  <div class="privacy-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-4.8"/></svg><span>Your history stays on this device and expires after 90 days. Searches go through this site’s relay; only YouTube’s own player connects from your device.</span></div>
+  <section id="searchArea" aria-label="Search">
+    <div class="search-label">
+      <span id="searchModeLabel">SEARCH VIDEOS</span>
+      <div class="search-label-actions">
+        <span id="searchHint" class="search-shortcut">PRESS ENTER TO EXPLORE</span>
+        <button id="urlModeToggle" type="button" aria-label="Switch to URL mode" aria-pressed="false" title="Use a video or playlist URL">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.2-1.2"/></svg>
+          <span id="urlModeText">URL</span>
+        </button>
+      </div>
+    </div>
+    <div id="searchLine">
+      <input id="searchInput" dir="auto" type="search" maxlength="200" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" placeholder="Search…" aria-label="Search">
+      <input id="url" type="text" maxlength="2048" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste a video or playlist link" aria-label="Video or playlist URL" hidden>
+      <button id="paste" type="button" aria-label="Paste link and play" title="Paste link and play" data-a="paste" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/></svg></button>
+      <button id="searchBtn" type="button" aria-label="Search" data-a="searchBtn">
+        <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+      </button>
+    </div>
+    <div id="suggestions" role="listbox" aria-label="Suggestions" hidden></div>
+    <div id="err" role="alert"></div>
+  </section>
+  <section id="historyWrap" hidden>
+    <div class="sec"><h2 data-t="recent">Recently watched</h2><button id="historyToggle" class="history-toggle" type="button" aria-expanded="false" hidden>Show more</button></div>
+    <div id="history" aria-label="Recently watched"></div>
+  </section>
+  <div class="discovery-head">
+    <div><span class="section-kicker">DISCOVER</span><h2>Explore by interest</h2></div>
+    <p>Choose a topic to shape your feed</p>
+  </div>
+  <nav id="chips" aria-label="Topics"></nav>
+  <section id="feedWrap">
+    <div class="sec feed-heading">
+      <div id="homeTools">
+        <button id="privacyMenuButton" class="icb" type="button" aria-label="More options" aria-haspopup="true" aria-expanded="false" aria-controls="privacyMenu" title="More options">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+        </button>
+        <div id="privacyMenu" role="region" aria-label="Privacy controls" hidden>
+          <strong>Privacy controls</strong>
+          <button id="privacyToggle" type="button" aria-pressed="false">Private mode: Off</button>
+          <button id="personalizeToggle" type="button" aria-pressed="false">Personalized feed: Off</button>
+          <p>Private mode pauses new history saves and stops history-based recommendations. The personalized feed is off by default: when you switch it on, search phrases made from videos you watched are sent through the relay to a public provider. Neither option makes you anonymous: Cloudflare receives your connection, and the YouTube player connects directly from your device.</p>
+          <a href="./privacy.html">Read the privacy notice</a>
+        </div>
+      </div>
+      <h2 id="feedTitle">For you</h2>
+      <div class="secActions">
+        <button id="histClear" type="button" data-t="clearHist">Clear my history</button>
+        <button id="feedRefresh" class="icb" type="button" aria-label="Refresh" title="Refresh recommendations" data-a="refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/></svg></button>
+      </div>
+    </div>
+    <p id="feedHint" class="note" hidden></p>
+    <div id="feed" aria-live="polite"></div>
+    <div id="feedLoading" class="load-status" role="status" aria-live="polite" hidden><span class="load-spinner" aria-hidden="true"></span><span id="feedLoadingText" data-t="loadingMore">Loading more videos…</span></div>
+    <div id="feedSentinel" class="feed-sentinel" aria-hidden="true"></div>
+  </section>
+  <section id="resultsWrap" hidden>
+    <div class="sec results-head"><div><div class="section-kicker">SEARCH RESULTS</div><h2 id="resTitle">Results</h2></div><button id="resClose" class="icb" type="button" aria-label="Close" data-a="close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div id="searchStatus" class="note search-status" role="status" aria-live="polite"></div>
+    <div id="results" aria-label="Results"></div>
+    <div id="resultsLoading" class="load-status" role="status" aria-live="polite" hidden><span class="load-spinner" aria-hidden="true"></span><span data-t="loadingMore">Loading more videos…</span></div>
+    <div id="resultsSentinel" class="feed-sentinel" aria-hidden="true"></div>
+  </section>
+  <footer id="foot">
+    <details><summary data-t="privacy">Privacy and storage</summary><p data-t="privacyText">Your watch history and interests are stored in this browser only and are not encrypted by the app. Search and video metadata normally use a same-origin Cloudflare relay. If the relay cannot provide storyboard data for timeline previews, the app may contact the official public Invidious servers directly from this browser; those servers can see your IP address. Storyboard images may load directly from YouTube image hosts. The embedded YouTube player also connects directly to YouTube. There is no account system or shared server-side history in this version.</p><p><a class="privacy-link" href="./privacy.html">Read the full privacy notice</a></p></details>
+    <details><summary data-t="install">Install as an app</summary><p data-t="tip">To open it like an app: on iPhone, tap Share in Safari, then “Add to Home Screen”. On Android, tap ⋮ then “Add to Home screen”.</p></details>
+  </footer>
+</main>
+
+<div id="stage" hidden>
+  <div id="slide" class="fill"><iframe id="yt" sandbox="allow-scripts allow-same-origin allow-presentation" allow="autoplay; encrypted-media; fullscreen" referrerpolicy="strict-origin-when-cross-origin" title="player"></iframe></div>
+  <div id="touch"></div>
+  <div id="ui">
+    <button id="b-back" aria-label="Back" data-a="back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button id="b-toggle" class="play-toggle" aria-label="Pause" data-a="pause"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button>
+  </div>
+  <div id="controlsDock">
+    <div id="bar">
+      <span id="tmCurrent">0:00</span>
+      <div id="trk">
+        <div id="tk"><div id="pf"></div></div>
+        <div id="seekPreview" aria-hidden="true"><div id="seekThumb"></div><span id="previewTime">0:00</span></div>
+      </div>
+      <span id="tmDuration">0:00</span>
+    </div>
+    <div id="playerActions">
+      <button id="b-rotate" type="button" aria-label="Rotate screen to landscape" title="Rotate screen to landscape" aria-pressed="false" data-a="rotate"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="4" width="10" height="16" rx="2"/><path d="M4 9a8 8 0 0 1 3-5M4 9 3 6M4 9l3-1M20 15a8 8 0 0 1-3 5M20 15l1 3M20 15l-3 1"/></svg></button>
+      <button id="b-aud" aria-label="Audio only" data-a="aud2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg></button>
+      <button id="b-autoplay" type="button" aria-label="Turn autoplay off" aria-pressed="true" title="Turn autoplay off"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7h-6a5 5 0 0 0-5 5"/><path d="m16 3 4 4-4 4"/><path d="M4 17h6a5 5 0 0 0 5-5"/><path d="m8 21-4-4 4-4"/><path d="m10 9 5 3-5 3z"/></svg></button>
+      <button id="b-zoom" type="button" aria-label="Shorts-style zoom" title="Shorts-style zoom" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M10.5 7.5v6M7.5 10.5h6"/></svg></button>
+      <button id="b-list" aria-label="List" data-a="list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+    </div>
+  </div>
+  <div id="flash"></div>
+  <div id="playerStatus" class="player-status" role="status" aria-live="polite" hidden><span class="load-spinner" aria-hidden="true"></span><span id="playerStatusText">Loading video…</span><a id="playerOpenYoutube" href="#" target="_blank" rel="noopener noreferrer" hidden>Open on YouTube</a></div>
+  <div id="audlbl" data-t="audlbl">Audio only mode</div>
+  <div id="list">
+    <div id="lh"><span data-t="videos">Videos</span><button id="lclose" aria-label="Close" data-a="close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div id="listTabs" role="tablist" aria-label="Video lists">
+      <button id="tabPlaylist" class="list-tab on" type="button" role="tab" aria-selected="true" data-t="playlistTab">My list</button>
+      <button id="tabRecommendations" class="list-tab" type="button" role="tab" aria-selected="false" data-t="recommendTab">Recommended</button>
+    </div>
+    <div id="rows"></div>
+  </div>
+  <div id="hint" data-t="hint">Swipe up for next • Double-tap left or right to skip</div>
+</div>
+
+
+
+<script src="./app.js?v=71" defer></script>
+</body>
+</html>
