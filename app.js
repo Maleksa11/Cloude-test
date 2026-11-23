@@ -288,39 +288,59 @@
     }
     drawStoryboardPreview(latest,thumb,tw);
   }
+  function startStoryboardImageLoad(entry,frame,thumb,tw,key,source,isRelay){
+    entry.src=source;
+    entry.image=new Image();
+    try{entry.image.fetchPriority='high';entry.image.decoding='async'}catch(e){}
+    entry.image.onload=function(){
+      delete storyboardImagePreloadRetryAt[key];
+      finishStoryboardImageLoad(entry,frame,thumb,tw,key);
+    };
+    entry.image.onerror=function(){
+      if(isRelay){
+        // Preserve the old direct-image fallback, but only after the privacy relay
+        // has failed. Normal preview and preload requests always try same-origin first.
+        var directUrl=storyboardImageFallbackUrl(key,frame.videoId);
+        if(directUrl){
+          entry.failed=false;
+          startStoryboardImageLoad(entry,frame,thumb,tw,key,directUrl,false);
+          return;
+        }
+      }
+      entry.failed=true;
+      storyboardImagePreloadRetryAt[key]=Date.now()+15000;
+      if(thumb&&thumb.dataset.previewUrl===key){
+        thumb.style.backgroundImage='none';
+        if(SB_DEBUG)setSbStage('img-fail: relay+direct');
+      }
+    };
+    entry.image.src=source;
+  }
   function drawStoryboardPreview(frame,thumb,tw){
     var key=frame.url;
     thumb._storyboardFrame=frame;
     var entry=storyboardImageCache[key];
-    if(!entry){
-      entry=storyboardImageCache[key]={loaded:false,failed:false,src:key,image:new Image(),fallbackTried:false};
-      entry.image.onload=function(){finishStoryboardImageLoad(entry,frame,thumb,tw,key)};
-      entry.image.onerror=function(){
-        if(!entry.fallbackTried){
-          var fallback=storyboardImageFallbackUrl(key,frame.videoId);
-          if(fallback){
-            entry.fallbackTried=true;entry.loaded=false;entry.failed=false;entry.src=fallback;entry.image=new Image();
-            entry.image.onload=function(){finishStoryboardImageLoad(entry,frame,thumb,tw,key)};
-            entry.image.onerror=function(){
-              entry.failed=true;
-              if(thumb.dataset.previewUrl===key){
-                thumb.style.backgroundImage='none';
-                if(SB_DEBUG)setSbStage('img-fail: direct+proxy');
-              }
-            };
-            entry.image.src=fallback;
-            return;
-          }
-        }
-        entry.failed=true;
-        if(thumb.dataset.previewUrl===key){
-          thumb.style.backgroundImage='none';
-          if(SB_DEBUG)setSbStage('img-fail: direct');
-        }
-      };
-      entry.image.src=key;
+    if(entry&&entry.failed){
+      var retryAt=storyboardImagePreloadRetryAt[key]||0;
+      if(retryAt>Date.now()){
+        if(SB_DEBUG)setSbStage('img-fail: retry-wait');
+        thumb.style.backgroundImage='none';
+        return;
+      }
+      delete storyboardImageCache[key];
+      delete storyboardImagePreloadRetryAt[key];
+      entry=null;
     }
-    if(SB_DEBUG)setSbStage(entry.failed?'img-fail':!entry.loaded?(entry.fallbackTried?'img-loading (proxy)':'img-loading'):(entry.fallbackTried?'img-ok (proxy)':'img-ok'));
+    if(!entry){
+      entry=storyboardImageCache[key]={loaded:false,failed:false,src:'',image:null,relayTried:true};
+      var proxyUrl=storyboardPreviewProxyUrl(key,frame.videoId);
+      if(proxyUrl&&proxyUrl!==key){
+        startStoryboardImageLoad(entry,frame,thumb,tw,key,proxyUrl,true);
+      }else{
+        startStoryboardImageLoad(entry,frame,thumb,tw,key,key,false);
+      }
+    }
+    if(SB_DEBUG)setSbStage(entry.failed?'img-fail':!entry.loaded?(entry.relayTried?'img-loading (relay)':'img-loading'):(entry.relayTried?'img-ok (relay)':'img-ok'));
     if(entry.failed){thumb.style.backgroundImage='none';return}
     if(!entry.loaded){
       thumb.style.backgroundImage='none';
@@ -350,32 +370,20 @@
   }
   function preloadStoryboardFrame(frame,id,thumb,tw){
     if(!frame||!isStoryboardImageUrl(frame.url,id))return '';
-    var key=frame.url;
-    if(storyboardImageCache[key])return key;
-    var retryAt=storyboardImagePreloadRetryAt[key]||0;
-    if(retryAt>Date.now())return key;
-    if(retryAt)delete storyboardImagePreloadRetryAt[key];
-    // Warm the sprite through the same-origin relay first, so the preload does not
-    // expose the visitor's IP to YouTube's image host. Direct loading remains the
-    // existing fallback if the relay image request fails.
-    var proxyUrl=storyboardPreviewProxyUrl(key,id);
-    if(!proxyUrl||proxyUrl===key)return '';
-    var entry=storyboardImageCache[key]={
-      loaded:false,failed:false,src:proxyUrl,image:new Image(),fallbackTried:true
-    };
-    entry.image.onload=function(){
+    var key=frame.url,entry=storyboardImageCache[key];
+    if(entry&&entry.failed){
+      var retryAt=storyboardImagePreloadRetryAt[key]||0;
+      if(retryAt>Date.now())return key;
+      delete storyboardImageCache[key];
       delete storyboardImagePreloadRetryAt[key];
-      finishStoryboardImageLoad(entry,frame,thumb,tw,key);
-    };
-    entry.image.onerror=function(){
-      storyboardImagePreloadRetryAt[key]=Date.now()+15000;
-      if(storyboardImageCache[key]===entry)delete storyboardImageCache[key];
-      var latest=thumb&&thumb._storyboardFrame;
-      if(latest&&latest.videoId===id&&latest.url===key&&thumb.dataset.previewUrl===key){
-        drawStoryboardPreview(latest,thumb,tw);
-      }
-    };
-    entry.image.src=proxyUrl;
+      entry=null;
+    }
+    if(entry)return key;
+    // Warm the sprite through the same-origin relay first, with high fetch priority.
+    // The image helper falls back to the old direct route only if the relay fails.
+    var proxyUrl=storyboardPreviewProxyUrl(key,id);
+    entry=storyboardImageCache[key]={loaded:false,failed:false,src:'',image:null,relayTried:!!(proxyUrl&&proxyUrl!==key)};
+    startStoryboardImageLoad(entry,frame,thumb,tw,key,proxyUrl&&proxyUrl!==key?proxyUrl:key,!!(proxyUrl&&proxyUrl!==key));
     return key;
   }
   function preloadStoryboardPreview(id,seconds){
