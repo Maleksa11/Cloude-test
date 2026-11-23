@@ -20,15 +20,18 @@ The build copies the public files into `dist/` and turns `functions/_lib/relay.j
 
 ## Rate limiting (recommended, 2 minutes)
 
-The Worker has a best-effort per-client limiter, but its memory is per instance. Add the real one in
-Cloudflare → Security → WAF → Rate limiting rules:
+The Worker has a best-effort per-client limiter, but its memory is per instance.
+
+**Important:** A zone-level WAF rate-limiting rule applies only when your Pages site is reached through a **proxied custom domain in a Cloudflare zone you control**. It does not apply to the shared `cloude-test.pages.dev` hostname. On the default `pages.dev` hostname, the Worker token bucket is the app-level limiter, but it is not a global, cross-isolate limit.
+
+If you later attach a proxied custom domain, you can add the zone-level rule in Cloudflare → Security → WAF → Rate limiting rules:
 
 - Match: URI Path starts with `/api/`
 - Characteristics: IP
 - Rate: `120` requests per `1 minute` (the page itself needs a few dozen when it loads thumbnails)
 - Action: Block for `1 minute`
 
-Without it, a script can still make the Worker spend your free-plan request quota.
+The zone rule adds a shared edge control for that custom hostname; it does not replace the Worker validation and rate limiter.
 
 ## After each deployment
 
