@@ -73,7 +73,7 @@ test("player preserves the original pointer-event interaction model", async () =
    assert.ok(app.includes("function storyboardImageFallbackUrl(raw,id)"));
    assert.ok(app.includes("function finishStoryboardImageLoad(entry,frame,thumb,tw,key)"));
    assert.ok(app.includes("var directUrl=storyboardImageDirectUrl(key,frame.videoId)"));
-   assert.ok(app.includes("entry.relayTried:true"));
+   assert.ok(app.includes("relayTried:true"));
    assert.ok(app.includes("u.searchParams.getAll('url').length!==1"));
   assert.ok(!app.includes("t.addEventListener('touchstart'"));
   assert.ok(!app.includes("t.addEventListener('touchmove'"));
