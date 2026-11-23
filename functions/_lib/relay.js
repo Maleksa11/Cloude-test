@@ -461,6 +461,12 @@ function isPreferredSearchText(value, language) {
   return true;
 }
 
+// Recommendations have no search-query language to infer from. Keep both requested
+// languages, English and Arabic, while rejecting titles identified as other languages.
+function isPreferredRecommendationText(value) {
+  return isPreferredSearchText(value, "en") || isPreferredSearchText(value, "ar");
+}
+
 async function fetchPipedFromHost(host, path, language = "en") {
   try {
     return await timedFetch("https://" + host + path, {
@@ -1038,7 +1044,7 @@ async function proxyPipedVideo(videoId, includeStoryboards = true, region = "JO"
   const related = Array.isArray(metadata.relatedStreams) ? metadata.relatedStreams : [];
   const recommendedVideos = related.map((item) => {
     const video = extractPipedVideo(item);
-    if (!video) return null;
+    if (!video || !isPreferredRecommendationText(video.title)) return null;
     return {
       videoId: video.videoId,
       title: video.title,
@@ -1091,42 +1097,112 @@ function safeImageRedirect(raw, videoId, type) {
 async function proxyImage(target, videoId, type) {
   let current = target;
   for (let hop = 0; hop <= 3; hop++) {
+    const abortController = new AbortController();
+    let finished = false;
+    let streamController = null;
+    let reader = null;
+    const timeout = setTimeout(() => {
+      if (finished) return;
+      abortController.abort();
+      if (reader) reader.cancel().catch(() => {});
+      if (streamController) {
+        try { streamController.error(new Error("Image request timed out.")); } catch {}
+      }
+    }, 7000);
     try {
-      const result = await timedFetch(current.href, {
+      const upstream = await fetch(current.href, {
         method: "GET",
         headers: privacyHeaders("image/avif,image/webp,image/apng,image/*,*/*;q=0.8"),
         redirect: "manual",
-        cf: { cacheEverything: true, cacheTtl: 86400 }
-      }, 7000, async (upstream) => {
-        if ([301,302,303,307,308].includes(upstream.status)) {
-          const location = upstream.headers.get("location");
-          const next = location ? safeImageRedirect(new URL(location, current).href, videoId, type) : null;
-          return next ? { redirect: next } : errorResponse("Unsafe image redirect.", 502);
-        }
-        if (!upstream.ok) return errorResponse("Image unavailable.", 502);
-        const contentType = upstream.headers.get("content-type") || "";
-        if (!/^image\/(?:jpeg|jpg|png|webp|avif)$/i.test(contentType)) {
-          return errorResponse("Unexpected image response.", 502);
-        }
-        const bytes = await upstream.arrayBuffer();
-        if (bytes.byteLength > MAX_IMAGE_BYTES) return errorResponse("Image too large.", 502);
-        return new Response(bytes, {
-          status: 200,
-          headers: {
-            "Content-Type": contentType,
-            "Cache-Control": "public, max-age=86400, s-maxage=86400",
-            "X-Content-Type-Options": "nosniff",
-            "Cross-Origin-Resource-Policy": "same-origin",
-            "Referrer-Policy": "no-referrer"
-          }
-        });
+        cf: { cacheEverything: true, cacheTtl: 86400 },
+        signal: abortController.signal
       });
-      if (result && result.redirect) {
-        current = result.redirect;
+      if ([301,302,303,307,308].includes(upstream.status)) {
+        clearTimeout(timeout);
+        const location = upstream.headers.get("location");
+        const next = location ? safeImageRedirect(new URL(location, current).href, videoId, type) : null;
+        try { await upstream.body?.cancel(); } catch {}
+        if (!next) return errorResponse("Unsafe image redirect.", 502);
+        current = next;
         continue;
       }
-      return result;
+      if (!upstream.ok) {
+        clearTimeout(timeout);
+        try { await upstream.body?.cancel(); } catch {}
+        return errorResponse("Image unavailable.", 502);
+      }
+      const contentType = upstream.headers.get("content-type") || "";
+      if (!/^image\/(?:jpeg|jpg|png|webp|avif)$/i.test(contentType)) {
+        clearTimeout(timeout);
+        try { await upstream.body?.cancel(); } catch {}
+        return errorResponse("Unexpected image response.", 502);
+      }
+      const declaredLength = Number(upstream.headers.get("content-length"));
+      if (Number.isFinite(declaredLength) && declaredLength > MAX_IMAGE_BYTES) {
+        clearTimeout(timeout);
+        try { await upstream.body?.cancel(); } catch {}
+        return errorResponse("Image too large.", 502);
+      }
+      if (!upstream.body) {
+        clearTimeout(timeout);
+        return errorResponse("Image unavailable.", 502);
+      }
+
+      // Stream the image to the browser as Cloudflare receives it. Buffering the
+      // entire sprite first added a second full transfer delay to the first preview.
+      // Count streamed bytes to retain the existing 4 MB response-size ceiling.
+      reader = upstream.body.getReader();
+      let totalBytes = 0;
+      const body = new ReadableStream({
+        start(controller) {
+          streamController = controller;
+        },
+        async pull(controller) {
+          try {
+            const chunk = await reader.read();
+            if (chunk.done) {
+              finished = true;
+              clearTimeout(timeout);
+              controller.close();
+              return;
+            }
+            totalBytes += chunk.value.byteLength;
+            if (totalBytes > MAX_IMAGE_BYTES) {
+              finished = true;
+              clearTimeout(timeout);
+              abortController.abort();
+              try { await reader.cancel(); } catch {}
+              controller.error(new Error("Image too large."));
+              return;
+            }
+            controller.enqueue(chunk.value);
+          } catch (error) {
+            finished = true;
+            clearTimeout(timeout);
+            try { controller.error(error); } catch {}
+          }
+        },
+        async cancel(reason) {
+          finished = true;
+          clearTimeout(timeout);
+          abortController.abort();
+          try { await reader.cancel(reason); } catch {}
+        }
+      });
+      return new Response(body, {
+        status: 200,
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "public, max-age=86400, s-maxage=86400",
+          "X-Content-Type-Options": "nosniff",
+          "Cross-Origin-Resource-Policy": "same-origin",
+          "Referrer-Policy": "no-referrer"
+        }
+      });
     } catch {
+      clearTimeout(timeout);
+      finished = true;
+      try { await reader?.cancel(); } catch {}
       return errorResponse("Image unavailable.", 502);
     }
   }
