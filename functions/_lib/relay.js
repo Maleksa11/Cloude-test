@@ -81,18 +81,38 @@ function rememberHost(host, ok) {
   hostState.set(host, state);
 }
 
+function shuffleHosts(hosts) {
+  const shuffled = hosts.slice();
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 function orderHosts(hosts) {
   const now = Date.now();
-  const rank = (host) => {
+  const entries = hosts.map((host, index) => {
     const state = hostState.get(host);
-    if (!state) return 1;
-    if (state.badUntil > now) return 2;
-    return state.lastGoodAt ? 0 : 1;
-  };
-  return hosts
-    .map((host, index) => ({ host, index, rank: rank(host), good: (hostState.get(host) || {}).lastGoodAt || 0 }))
-    .sort((a, b) => a.rank - b.rank || (a.rank === 0 ? b.good - a.good : 0) || a.index - b.index)
+    const rank = !state ? 1 : state.badUntil > now ? 2 : state.lastGoodAt ? 0 : 1;
+    return { host, index, rank, good: state ? state.lastGoodAt || 0 : 0 };
+  });
+
+  // Keep recently successful providers first and recently failing providers last.
+  // Shuffle only equal-health candidates, so a cold isolate does not always spend
+  // its five-provider privacy budget on the same static prefix of the allowlist.
+  const knownGood = entries
+    .filter((entry) => entry.rank === 0)
+    .sort((a, b) => b.good - a.good || a.index - b.index)
     .map((entry) => entry.host);
+  const untested = shuffleHosts(entries
+    .filter((entry) => entry.rank === 1)
+    .map((entry) => entry.host));
+  const coolingDown = shuffleHosts(entries
+    .filter((entry) => entry.rank === 2)
+    .map((entry) => entry.host));
+
+  return [...knownGood, ...untested, ...coolingDown];
 }
 
 // Cross-isolate memory of "which provider worked last", kept in the datacenter's
