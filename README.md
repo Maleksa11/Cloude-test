@@ -3,8 +3,8 @@
 A small, privacy-first YouTube search and player, served as a static site plus one Cloudflare Worker.
 
 > **Version 71 (hardened).** The relay and the page were reworked for privacy and isolation. The
-> previous long change log is kept in `docs/CHANGELOG-legacy.md`; the findings behind this version
-> are in `docs/SECURITY_AUDIT_AR.md` (Arabic).
+> previous long change log is kept in `docs/CHANGELOG-legacy.md`.
+> **Scope note:** `docs/SECURITY_AUDIT_AR.md` describes `Maleksa11/MtubeOld`, not this repository. It is retained as historical reference and is not a security audit of Cloude-test.
 
 ## What it is — and what it is not
 
@@ -54,7 +54,7 @@ node scripts/dev-server.mjs                  # preview on http://127.0.0.1:8788 
 
 | Name | Purpose |
 |---|---|
-| `SITE_ORIGIN` | Your production origin, e.g. `https://tube.example.org`. Defaults to `https://mtube-test.pages.dev`. Must be a bare `https://` origin. Its subdomains (previews) are allowed too. |
+| `SITE_ORIGIN` | Your production origin, e.g. `https://tube.example.org`. Defaults to `https://cloude-test.pages.dev`. Must be a bare `https://` origin. Its subdomains (previews) are allowed too. |
 | `HEALTH_TOKEN` *(secret)* | Enables `/api/piped-health` (a deep probe of every provider) for requests sending `X-Health-Token`. Unset = disabled. |
 | `EXPOSE_DIAGNOSTICS` | Set to `1` temporarily to include provider names/failure reasons in API error bodies while debugging. Leave unset in production. |
 

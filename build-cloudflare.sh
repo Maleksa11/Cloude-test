@@ -5,6 +5,8 @@ set -eu
 rm -rf dist
 mkdir -p dist
 cp index.html app.js style.css sw.js icon.svg manifest.webmanifest privacy.html _headers dist/
+# Cloudflare parses _headers line-by-line; strip Windows CR characters from the published copy.
+tr -d '\r' < _headers > dist/_headers
 
 # Cloudflare Pages Advanced Mode: one Worker owns only the API surface.
 # Pages ignores /functions when dist/_worker.js exists.

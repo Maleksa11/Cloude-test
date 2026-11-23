@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 
-const ORIGIN = "https://mtube-test.pages.dev";
+const ORIGIN = "https://cloude-test.pages.dev";
 
 // Runs the real sw.js in a sandbox with an in-memory Cache Storage and a scripted network.
 async function loadWorker(network) {

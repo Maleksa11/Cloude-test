@@ -1,4 +1,5 @@
-// Builds dist/ for Cloudflare Pages (Advanced Mode). Start it with `sh build-cloudflare.sh`.
+// Optional Node-based builder. Run with `node scripts/build.mjs`.
+// Cloudflare Pages uses the shell entry point `sh build-cloudflare.sh`.
 //
 // This is Node rather than shell on purpose: a shell script saved with Windows (CRLF)
 // line endings fails on Linux ("set: Illegal option -"), while Node does not care.

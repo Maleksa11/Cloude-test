@@ -22,6 +22,7 @@ for (const file of browserFiles) {
 // 2. Both CSP copies keep the browser on its own origin and enforce Trusted Types.
 const html = await read("dist/index.html");
 const headers = await read("dist/_headers");
+check(!headers.includes("\r"), "deployed _headers must use LF line endings");
 const metaCsp = (html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || "";
 const headerCsp = (headers.match(/Content-Security-Policy: ([^\r\n]+)/) || [])[1] || "";
 for (const [name, policy] of [["meta CSP", metaCsp], ["header CSP", headerCsp]]) {

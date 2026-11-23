@@ -2,7 +2,7 @@ import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { handleApiRequest, resetRelayState } from "../functions/_lib/relay.js";
 
-const SITE = "https://mtube-test.pages.dev";
+const SITE = "https://cloude-test.pages.dev";
 const originalFetch = globalThis.fetch;
 const PIPED_FIRST = "pipedapi.kavin.rocks";
 const PIPED_HOSTS = [

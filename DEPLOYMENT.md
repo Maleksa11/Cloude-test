@@ -14,7 +14,7 @@ The build copies the public files into `dist/` and turns `functions/_lib/relay.j
 
 | Variable | Type | Notes |
 |---|---|---|
-| `SITE_ORIGIN` | plain | Required when you move to your own domain. Bare `https://` origin only. Without it the Worker answers `404` on any other host. |
+| `SITE_ORIGIN` | plain | Optional for the default project; the Worker defaults to `https://cloude-test.pages.dev`. Set a bare `https://` origin when using a custom domain. |
 | `HEALTH_TOKEN` | secret | Optional. Enables `/api/piped-health`; send `X-Health-Token: <value>`. |
 | `EXPOSE_DIAGNOSTICS` | plain | Debug only (`1`). Shows provider names/failure reasons in error bodies. |
 

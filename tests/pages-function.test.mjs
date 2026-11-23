@@ -13,7 +13,7 @@ import { onRequest as oembedRoute } from "../functions/api/youtube/oembed.js";
 import pagesWorker from "../dist/_worker.js";
 const onRequest = (context) => handleApiRequest(context.request);
 
-const SITE = "https://mtube-test.pages.dev";
+const SITE = "https://cloude-test.pages.dev";
 const originalFetch = globalThis.fetch;
 
 // Provider health and rate-limit memory is module state; every test starts clean.
@@ -95,6 +95,19 @@ test("player preserves the original pointer-event interaction model", async () =
 
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
   assert.ok(sw.includes("malek-tube-shell-v71"));
+});
+
+
+test("YouTube player iframe keeps a restrictive sandbox", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const iframe = html.match(/<iframe\b(?=[^>]*\bid="yt")[^>]*>/i);
+  assert.ok(iframe, "the YouTube player iframe must exist");
+  const sandbox = iframe[0].match(/\bsandbox="([^"]*)"/i);
+  assert.ok(sandbox, "the YouTube player iframe must be sandboxed");
+  const capabilities = sandbox[1].trim().split(/\s+/).sort();
+  assert.deepEqual(capabilities, ["allow-presentation", "allow-same-origin", "allow-scripts"].sort());
+  assert.doesNotMatch(sandbox[1], /\ballow-popups(?:-to-escape-sandbox)?\b/);
+  assert.doesNotMatch(sandbox[1], /\ballow-top-navigation(?:-by-user-activation)?\b/);
 });
 
 test("page CSP lets the browser talk to this origin only, and header and meta policies agree", async () => {
@@ -184,8 +197,8 @@ test("allows search and suggestions from Cloudflare Pages preview hosts", async 
     }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   try {
-    const hashedPreview = "https://6b1411df.mtube-test.pages.dev";
-    const branchPreview = "https://fix-player-longpress-storybo.mtube-test.pages.dev";
+    const hashedPreview = "https://6b1411df.cloude-test.pages.dev";
+    const branchPreview = "https://fix-player-longpress-storybo.cloude-test.pages.dev";
     const suggestions = await handleApiRequest(new Request(
       hashedPreview + "/api/v1/search/suggestions?q=privacy",
       { headers: { Origin: hashedPreview, "Sec-Fetch-Site": "same-origin" } }
@@ -210,11 +223,11 @@ test("rejects non-project preview hosts and mismatched preview origins", async (
   globalThis.fetch = async () => { called = true; throw new Error("must not fetch"); };
   try {
     const outside = await handleApiRequest(new Request(
-      "https://mtube-test.pages.dev.attacker.example/api/v1/search/suggestions?q=privacy"
+      "https://cloude-test.pages.dev.attacker.example/api/v1/search/suggestions?q=privacy"
     ));
     const mismatched = await handleApiRequest(new Request(
-      "https://preview-a.mtube-test.pages.dev/api/v1/search/suggestions?q=privacy",
-      { headers: { Origin: "https://preview-b.mtube-test.pages.dev", "Sec-Fetch-Site": "same-origin" } }
+      "https://preview-a.cloude-test.pages.dev/api/v1/search/suggestions?q=privacy",
+      { headers: { Origin: "https://preview-b.cloude-test.pages.dev", "Sec-Fetch-Site": "same-origin" } }
     ));
     assert.equal(outside.status, 404);
     assert.equal(mismatched.status, 403);
