@@ -108,10 +108,14 @@ test("preloads the first storyboard sprite as soon as current video metadata is 
     app.indexOf("function showListMessage(message)")
   );
   assert.ok(preload.includes("storyboardAt(id,0)"), "warm the initial video-time sprite");
-  assert.ok(preload.includes("drawStoryboardPreview(frame,thumb,tw)"), "use the existing validated image loader and cache");
+  assert.ok(preload.includes("storyboardPreviewProxyUrl(key,id)"), "warm the image through the same-origin storyboard relay first");
+  assert.ok(preload.includes("entry.image.src=proxyUrl"), "start the same-origin image request before the first seek");
+  assert.ok(preload.includes("entry.image.onerror"), "keep the existing direct-image fallback if the relay image request fails");
+  assert.ok(preload.includes("drawStoryboardPreview(frame,thumb,tw)"), "reuse the existing validated image loader and cache");
   assert.ok(preload.includes("if(!id||id!==currentVideoId||seekHover)return"), "only warm the active video when the timeline is not being used");
   assert.ok(!preload.includes("fetch("), "preloading must not add a new fetch path");
   assert.ok(!preload.includes("https://"), "preloading must not introduce a new external host");
+  assert.ok(app.includes("function storyboardPreviewProxyUrl(raw,id)"));
   assert.ok(videoInfo.includes("if(id===currentVideoId)preloadStoryboardPreview(id)"), "start preloading as soon as metadata is received");
   assert.ok(app.includes("var preloadedStoryboardKey=''"), "retain only the active preloaded sheet key");
 });
