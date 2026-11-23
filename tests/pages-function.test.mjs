@@ -72,8 +72,8 @@ test("player preserves the original pointer-event interaction model", async () =
   assert.ok(!app.includes("drawSeekThumbnailFallback"), "do not disguise a failed storyboard with the static video thumbnail");
    assert.ok(app.includes("function storyboardImageFallbackUrl(raw,id)"));
    assert.ok(app.includes("function finishStoryboardImageLoad(entry,frame,thumb,tw,key)"));
-   assert.ok(app.includes("var fallback=storyboardImageFallbackUrl(key,frame.videoId)"));
-   assert.ok(app.includes("entry.fallbackTried=true"));
+   assert.ok(app.includes("var directUrl=storyboardImageDirectUrl(key,frame.videoId)"));
+   assert.ok(app.includes("entry.relayTried:true"));
    assert.ok(app.includes("u.searchParams.getAll('url').length!==1"));
   assert.ok(!app.includes("t.addEventListener('touchstart'"));
   assert.ok(!app.includes("t.addEventListener('touchmove'"));
@@ -571,6 +571,8 @@ test("storyboard VTT route rejects invalid dimensions before contacting provider
 });
 
 test("Piped metadata uses regional Invidious video JSON and restores direct YouTube sprite images", async () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.999999;
   const upstreamHeaders = [];
   const invidiousHosts = [
     "inv.nadeko.net", "invidious.nerdvpn.de",
@@ -637,10 +639,13 @@ test("Piped metadata uses regional Invidious video JSON and restores direct YouT
 
     assert.ok(sprite0Url.href.includes("sqp=abc") && sprite1Url.href.includes("sqp=abc"));
   } finally {
+    Math.random = originalRandom;
     globalThis.fetch=originalFetch;
   }
 });
 test("uses dedicated storyboard JSON only when regional video metadata has no boards", async () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.999999;
   const invidiousHosts = ["inv.nadeko.net", "invidious.nerdvpn.de", "yt.chocolatemoo53.com", "invidious.tiekoetter.com"];
   const routes = [];
   globalThis.fetch = async (url) => {
@@ -680,6 +685,7 @@ test("uses dedicated storyboard JSON only when regional video metadata has no bo
     assert.ok(routes.includes("/api/v1/storyboards/dQw4w9WgXcQ"));
     assert.ok(routes.indexOf("/api/v1/videos/dQw4w9WgXcQ") < routes.indexOf("/api/v1/storyboards/dQw4w9WgXcQ"));
   } finally {
+    Math.random = originalRandom;
     globalThis.fetch = originalFetch;
   }
 });
