@@ -340,12 +340,19 @@
     thumb.style.backgroundPosition=(-tileX*scale)+'px '+(-tileY*scale)+'px';
     thumb.style.backgroundRepeat='no-repeat';
   }
+  function storyboardPreviewProxyUrl(raw,id){
+    try{
+      var u=new URL(raw,location.origin);
+      if(u.origin===location.origin&&u.pathname==='/api/storyboard')return u.pathname+u.search;
+    }catch(e){}
+    return storyboardImageFallbackUrl(raw,id);
+  }
   function preloadStoryboardPreview(id){
     if(!id||id!==currentVideoId||seekHover)return;
     var frame=storyboardAt(id,0);
     if(!frame)return;
     var thumb=$('seekThumb'),tw=160,key=frame.url;
-    if(!thumb)return;
+    if(!thumb||!isStoryboardImageUrl(key,id))return;
     if(preloadedStoryboardKey&&preloadedStoryboardKey!==key){
       delete storyboardImageCache[preloadedStoryboardKey];
     }
@@ -353,7 +360,28 @@
     thumb.style.width=tw+'px';
     thumb.style.height=Math.max(54,Math.round(tw*frame.h/frame.w))+'px';
     thumb.dataset.previewUrl=key;
-    drawStoryboardPreview(frame,thumb,tw);
+    thumb._storyboardFrame=frame;
+    if(storyboardImageCache[key]){
+      drawStoryboardPreview(frame,thumb,tw);
+      return;
+    }
+    // Warm the sprite through the same-origin relay first, so the preload does not
+    // expose the visitor's IP to YouTube's image host. Direct loading remains the
+    // existing fallback if the relay image request fails.
+    var proxyUrl=storyboardPreviewProxyUrl(key,id);
+    if(!proxyUrl||proxyUrl===key){
+      drawStoryboardPreview(frame,thumb,tw);
+      return;
+    }
+    var entry=storyboardImageCache[key]={
+      loaded:false,failed:false,src:proxyUrl,image:new Image(),fallbackTried:true
+    };
+    entry.image.onload=function(){finishStoryboardImageLoad(entry,frame,thumb,tw,key)};
+    entry.image.onerror=function(){
+      if(storyboardImageCache[key]===entry)delete storyboardImageCache[key];
+      drawStoryboardPreview(frame,thumb,tw);
+    };
+    entry.image.src=proxyUrl;
   }
   var lastSeekPreviewEvent=null,seekMetadataWaitId='';
   function requestStoryboardPreviewData(id){
