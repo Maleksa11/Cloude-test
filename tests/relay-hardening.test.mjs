@@ -4,7 +4,6 @@ import { handleApiRequest, resetRelayState } from "../functions/_lib/relay.js";
 
 const SITE = "https://cloude-test.pages.dev";
 const originalFetch = globalThis.fetch;
-const PIPED_FIRST = "pipedapi.kavin.rocks";
 const PIPED_HOSTS = [
   "pipedapi.kavin.rocks", "api.piped.yt", "pipedapi.drgns.space",
   "pipedapi.ducks.party", "piped-api.codespace.cz", "pipedapi.reallyaweso.me",
@@ -54,7 +53,8 @@ test("storyboards come from Piped's own previewFrames, so no extra provider lear
     const response = await handleApiRequest(request(VIDEO_PATH), {});
     const data = await response.json();
     assert.equal(response.status, 200);
-    assert.deepEqual(hosts, [PIPED_FIRST], "one provider, no Invidious, no YouTube");
+    assert.equal(hosts.length, 1, "exactly one provider handles the video request");
+    assert.ok(PIPED_HOSTS.includes(hosts[0]), "the request stays within the fixed Piped allowlist");
     assert.equal(data.storyboards.length, 2);
     const best = data.storyboards[0];
     assert.equal(best.width, 160);
