@@ -116,6 +116,7 @@ test("warms storyboard sprites near the current playhead before timeline hover",
   assert.ok(preload.includes("storyboardPreviewProxyUrl(key,id)"), "warm images through the same-origin storyboard relay first");
   assert.ok(preload.includes("entry.image.src=proxyUrl"), "start the same-origin image request before the first seek");
   assert.ok(preload.includes("entry.image.onerror"), "retain the existing image fallback when the relay request fails");
+  assert.ok(preload.includes("storyboardImagePreloadRetryAt[key]=Date.now()+15000"), "back off a failed warmup instead of retrying on every playback tick");
   assert.ok(preload.includes("drawStoryboardPreview(latest,thumb,tw)"), "retry through the existing validated preview renderer when the active warmup fails");
   assert.ok(preload.includes("preloadedStoryboardKeys"), "retain only a small rolling set of active sprite keys");
   assert.ok(preload.includes("if(!id||id!==currentVideoId||seekHover)return"), "only warm the active video when the timeline is not being used");
