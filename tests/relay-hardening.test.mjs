@@ -70,6 +70,87 @@ test("storyboards come from Piped's own previewFrames, so no extra provider lear
   }
 });
 
+test("search ranks English, Arabic and neutral titles first without dropping other languages", async () => {
+  const source = [
+    { title: "RTX 5090 im Test", url: "/watch?v=dQw4w9WgXcQ", duration: 5 },
+    { title: "Pokémon RTX 5090", url: "/watch?v=9bZkp7q19f0", duration: 5 },
+    { title: "Praxistest RTX 5090", url: "/watch?v=BaW_jenozKc", duration: 5 },
+    { title: "RTX 5090 review and benchmark", url: "/watch?v=jfKfPfyJRdk", duration: 5 },
+    { title: "Kraftwerk RTX 5090", url: "/watch?v=aqz-KE-bpKQ", duration: 5 },
+    { title: "RTX 5090 بالعربي", url: "/watch?v=ScMzIvxBSi4", duration: 5 },
+    { title: "Founders Edition Review - Brutale Leistung", url: "/watch?v=Zi_XLOBDo_YU", duration: 5 },
+    { title: "RTX 5090", url: "/watch?v=kJQP7kiw5Fk", duration: 5 },
+    { title: "Beyoncé RTX 5090", url: "/watch?v=M7lc1UVf-VE", duration: 5 },
+    { title: "bauen Anleitung RTX 5090", url: "/watch?v=L_jWHffIx5E", duration: 5 },
+    { title: "東京 RTX 5090", url: "/watch?v=oHg5SJYRHA0", duration: 5 }
+  ];
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: new URL(String(url)), headers: new Headers(init && init.headers) });
+    return json({ items: source, nextpage: "opaque-next-page" });
+  };
+  try {
+    const response = await handleApiRequest(request(
+      "/api/v1/search?q=RTX+5090&type=video&page=1&region=JO&hl=en"
+    ), {});
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(data.items.map((video) => video.title), [
+      "Pokémon RTX 5090",
+      "RTX 5090 review and benchmark",
+      "Kraftwerk RTX 5090",
+      "RTX 5090 بالعربي",
+      "RTX 5090",
+      "Beyoncé RTX 5090",
+      "RTX 5090 im Test",
+      "Praxistest RTX 5090",
+      "Founders Edition Review - Brutale Leistung",
+      "bauen Anleitung RTX 5090",
+      "東京 RTX 5090"
+    ]);
+    assert.equal(data.items.length, source.length, "language ranking must not discard search results");
+    assert.equal(data.nextPage, "opaque-next-page", "the opaque pagination cursor must be returned unchanged");
+    assert.equal(calls.length, 1, "a healthy provider with mixed-language results must receive only one search request");
+    assert.ok(PIPED_HOSTS.includes(calls[0].url.hostname));
+    assert.equal(calls[0].headers.get("accept-language"), "en-US,en;q=0.9");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("search suggestions are ranked without filtering and use the query language header", async () => {
+  const suggestionSource = ["RTX 5090 im Test", "RTX 5090", "RTX 5090 review", "RTX 5090 بالعربي"];
+  const seen = [];
+  globalThis.fetch = async (url, init) => {
+    seen.push({ url: new URL(String(url)), headers: new Headers(init && init.headers) });
+    return json(suggestionSource);
+  };
+  try {
+    const english = await handleApiRequest(request("/api/v1/search/suggestions?q=RTX+5090"), {});
+    assert.deepEqual((await english.json()).suggestions, [
+      "RTX 5090",
+      "RTX 5090 review",
+      "RTX 5090 بالعربي",
+      "RTX 5090 im Test"
+    ]);
+    resetRelayState();
+    const arabic = await handleApiRequest(request(
+      "/api/v1/search/suggestions?q=" + encodeURIComponent("RTX 5090 بالعربي")
+    ), {});
+    assert.deepEqual((await arabic.json()).suggestions, [
+      "RTX 5090",
+      "RTX 5090 review",
+      "RTX 5090 بالعربي",
+      "RTX 5090 im Test"
+    ]);
+    assert.equal(seen.length, 2, "each successful suggestions request uses only one provider");
+    assert.equal(seen[0].headers.get("accept-language"), "en-US,en;q=0.9");
+    assert.equal(seen[1].headers.get("accept-language"), "ar,en;q=0.9");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("storyboard image relay streams bytes before the upstream image finishes", async () => {
   let releaseStream;
   let upstreamFinished = false;

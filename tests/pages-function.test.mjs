@@ -107,6 +107,10 @@ test("warms storyboard sprites near the current playhead before timeline hover",
     app.indexOf("function startStoryboardImageLoad(entry,frame,thumb,tw,key,source,isRelay){"),
     app.indexOf("function drawStoryboardPreview(frame,thumb,tw){")
   );
+  const drawPreview = app.slice(
+    app.indexOf("function drawStoryboardPreview(frame,thumb,tw){"),
+    app.indexOf("function storyboardPreviewProxyUrl(raw,id){")
+  );
   const videoInfo = app.slice(
     app.indexOf("function loadVideoInfo(id){"),
     app.indexOf("function showListMessage(message)")
@@ -122,7 +126,10 @@ test("warms storyboard sprites near the current playhead before timeline hover",
   assert.ok(preload.includes("if(!id||id!==currentVideoId||seekHover)return"), "only warm the active video when the timeline is not being used");
   assert.ok(!preload.includes("fetch("), "preloading must not add a new fetch path");
   assert.ok(!preload.includes("https://"), "preloading must not introduce a new external host");
-  assert.ok(imageLoader.includes("entry.image.fetchPriority='high'"), "prioritize the initial storyboard image request");
+  assert.ok(imageLoader.includes("entry.image.fetchPriority=priority||'low'"), "background storyboard preloads must not compete with user-visible playback");
+  assert.ok(imageLoader.includes("image.decode()"), "wait for image decode before painting a newly loaded storyboard");
+  assert.ok(preload.includes("proxyUrl&&proxyUrl!==key?proxyUrl:key,!!(proxyUrl&&proxyUrl!==key),'low'"), "preloads use low network priority");
+  assert.ok(drawPreview.includes("entry.image.fetchPriority='high'"), "a hovered frame promotes an existing preload where the browser supports it");
   assert.ok(imageLoader.includes("if(isRelay)"), "attempt the privacy relay before the direct fallback");
   assert.ok(imageLoader.includes("storyboardImageDirectUrl(key,frame.videoId)"), "only try the direct image after relay failure");
   assert.ok(paint.includes("preloadStoryboardPreview(currentVideoId,t)"), "keep the current playhead sheet warm as playback advances");

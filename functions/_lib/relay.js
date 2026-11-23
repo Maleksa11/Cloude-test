@@ -467,6 +467,57 @@ function isPreferredRecommendationText(value) {
   return isPreferredSearchText(value, "en") || isPreferredSearchText(value, "ar");
 }
 
+// Search results are ranked, never discarded, by the language evidence in the title.
+// Arabic and identifiable English titles share the first tier. Titles with too little
+// evidence to identify a language stay neutral in that tier instead of being guessed
+// from a product name such as "RTX 5090".
+const ENGLISH_SEARCH_WORDS = new Set(
+  "review benchmark unboxing gaming gameplay tutorial explained guide comparison best how the new official setup performance first look build pc video news update full walkthrough trailer specs price launch hands-on hands on test".split(" ")
+);
+const CONFIRMED_OTHER_LANGUAGE_WORDS = new Set([
+  ...NON_ENGLISH_STRONG_WORDS,
+  "leistung", "leistungen", "brutale", "praxistest", "anleitung", "bauen",
+  "kaufberatung", "vergleich", "vergleichstest", "grafikkarte", "treiber",
+  "kuhlung", "kühlung", "übertaktung", "prueba", "reseña", "analisis",
+  "análisis", "comparativa", "recensione", "confronto", "migliore",
+  "meilleur", "meilleure", "essai"
+]);
+function languageTier(value) {
+  const text = String(value || "").normalize("NFKC").trim();
+  const letters = Array.from(text).filter((character) => /\\p{L}/u.test(character));
+  if (!letters.length) return "neutral";
+
+  const arabicCount = letters.filter((character) => /\\p{Script=Arabic}/u.test(character)).length;
+  if (arabicCount >= 2 && arabicCount / letters.length >= 0.2) return "preferred";
+
+  // A non-Latin, non-Arabic script is positive evidence of another language.
+  if (letters.some((character) =>
+    !/\\p{Script=Latin}/u.test(character) && !/\\p{Script=Arabic}/u.test(character)
+  )) return "other";
+
+  const rawWords = text.toLowerCase().match(/\\p{L}+/gu) || [];
+  const normalizedWords = text.normalize("NFD").replace(/\\p{M}/gu, "").toLowerCase().match(/\\p{L}+/gu) || [];
+  const words = new Set([...rawWords, ...normalizedWords]);
+
+  if ([...words].some((word) => CONFIRMED_OTHER_LANGUAGE_WORDS.has(word))) return "other";
+  if (/\\bim\\s+(?:test|vergleich|benchmark)\\b|\\b(?:praxistest|anleitung|kaufberatung|brutale\\s+leistung)\\b/i.test(text)) {
+    return "other";
+  }
+  for (const markers of NON_ENGLISH_WORDS) {
+    let score = 0;
+    for (const word of words) if (markers.has(word)) score++;
+    if (score >= 2) return "other";
+  }
+  if ([...words].some((word) => ENGLISH_SEARCH_WORDS.has(word))) return "preferred";
+  return "neutral";
+}
+function rankByLanguage(items, getTitle) {
+  return items
+    .map((item, index) => ({ item, index, tier: languageTier(getTitle(item)) }))
+    .sort((a, b) => Number(a.tier === "other") - Number(b.tier === "other") || a.index - b.index)
+    .map((entry) => entry.item);
+}
+
 async function fetchPipedFromHost(host, path, language = "en") {
   try {
     return await timedFetch("https://" + host + path, {
@@ -496,33 +547,16 @@ async function fetchPipedFromHost(host, path, language = "en") {
 }
 
 // One provider at a time (see hedgedRace): the request is not broadcast.
-async function fetchPiped(path, validate) {
+async function fetchPiped(path, validate, language = "en") {
   return hedgedRace(PIPED_HOSTS, async (host) => {
-    const result = await fetchPipedFromHost(host, path);
+    const result = await fetchPipedFromHost(host, path, language);
     if (!result.ok) return result;
     if (!validate(result.data)) return { ok: false, failure: { host, status: "unexpected-data" } };
     return { ok: true, host, data: result.data };
   }, { group: "piped", maxAttempts: PIPED_MAX_ATTEMPTS });
 }
 
-async function fetchPipedPreferred(path, language, validate, project) {
-  let fallback = null;
-  const result = await hedgedRace(PIPED_HOSTS, async (host) => {
-    const fetched = await fetchPipedFromHost(host, path, language);
-    if (!fetched.ok) return fetched;
-    if (!validate(fetched.data)) return { ok: false, failure: { host, status: "unexpected-data" } };
-    const matches = project(fetched.data).filter((item) => isPreferredSearchText(item.text, language));
-    if (matches.length) return { ok: true, host, data: fetched.data, matches };
-    // A healthy provider that simply has no result in the requested language:
-    // remember it, but keep looking (bounded by the attempt budget) without
-    // marking the provider as broken.
-    if (!fallback) fallback = { ok: true, host, data: fetched.data, matches: [] };
-    return { ok: false, soft: true, failure: { host, status: "no-language-match" } };
-  }, { group: "piped", maxAttempts: PIPED_MAX_ATTEMPTS });
-  if (result.ok) return result;
-  if (fallback) return fallback;
-  return result;
-}
+
 
 function pipedSearchPath(url) {
   const params = new URLSearchParams();
@@ -536,18 +570,19 @@ function pipedSearchPath(url) {
 async function proxyPipedSearch(url) {
   const path = pipedSearchPath(url);
   const language = preferredSearchLanguage(one(url, "q"));
-  // Piped's public search API has no locale parameter, so enforce language on returned titles.
-  const result = await fetchPipedPreferred(
+  const result = await fetchPiped(
     path,
-    language,
     (data) => !!data && typeof data === "object" && !Array.isArray(data) && Array.isArray(data.items),
-    (data) => data.items.map(extractPipedVideo).filter(Boolean).map((video) => ({ text: video.title, value: video }))
+    language
   );
   if (!result.ok) {
     console.warn("[MTube relay] All Piped search providers failed:", result.failures);
     return jsonResponse({ error: "Video search is temporarily unavailable.", ...publicDiagnostics("providers", result.failures) }, 503);
   }
-  const items = result.matches.map((item) => item.value);
+  // Reordering is local to this provider response. Keep every valid result and pass
+  // the provider's opaque next-page cursor through unchanged.
+  const videos = result.data.items.map(extractPipedVideo).filter(Boolean);
+  const items = rankByLanguage(videos, (video) => video.title);
   const nextPage = typeof result.data.nextpage === "string" && result.data.nextpage.length <= 10000
     ? result.data.nextpage : null;
   return jsonResponse({ items, nextPage });
@@ -556,17 +591,16 @@ async function proxyPipedSearch(url) {
 async function proxyPipedSuggestions(query) {
   const params = new URLSearchParams({ query });
   const language = preferredSearchLanguage(query);
-  const result = await fetchPipedPreferred(
-    "/suggestions?" + params.toString(),
-    language,
-    Array.isArray,
-    (data) => data.filter((item) => typeof item === "string").map((value) => ({ text: value, value }))
-  );
+  const result = await fetchPiped("/suggestions?" + params.toString(), Array.isArray, language);
   if (!result.ok) {
     console.warn("[MTube relay] All Piped suggestion providers failed:", result.failures);
     return jsonResponse({ error: "Search suggestions are temporarily unavailable.", ...publicDiagnostics("providers", result.failures) }, 503);
   }
-  return jsonResponse({ suggestions: result.matches.map((item) => item.value).slice(0, 12) });
+  const suggestions = rankByLanguage(
+    result.data.filter((item) => typeof item === "string"),
+    (value) => value
+  ).slice(0, 12);
+  return jsonResponse({ suggestions });
 }
 
 
