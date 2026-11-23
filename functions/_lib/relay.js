@@ -468,8 +468,8 @@ function isPreferredRecommendationText(value) {
 }
 
 // Search results are ranked, never discarded, by the language evidence in the title.
-// Arabic and identifiable English titles share the first tier. Titles with too little
-// evidence to identify a language stay neutral in that tier instead of being guessed
+// Arabic and identifiable English titles rank first. Titles with too little evidence
+// stay neutral in the middle tier instead of being guessed from product names
 // from a product name such as "RTX 5090".
 const ENGLISH_SEARCH_WORDS = new Set(
   "review benchmark unboxing gaming gameplay tutorial explained guide comparison best how the new official setup performance first look build pc video news update full walkthrough trailer specs price launch hands-on hands on test".split(" ")
@@ -514,7 +514,8 @@ function languageTier(value) {
 function rankByLanguage(items, getTitle) {
   return items
     .map((item, index) => ({ item, index, tier: languageTier(getTitle(item)) }))
-    .sort((a, b) => Number(a.tier === "other") - Number(b.tier === "other") || a.index - b.index)
+    .sort((a, b) => ({ preferred: 0, neutral: 1, other: 2 })[a.tier] -
+      ({ preferred: 0, neutral: 1, other: 2 })[b.tier] || a.index - b.index)
     .map((entry) => entry.item);
 }
 

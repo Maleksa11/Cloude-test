@@ -96,10 +96,10 @@ test("search ranks English, Arabic and neutral titles first without dropping oth
     const data = await response.json();
     assert.equal(response.status, 200);
     assert.deepEqual(data.items.map((video) => video.title), [
-      "Pokémon RTX 5090",
       "RTX 5090 review and benchmark",
-      "Kraftwerk RTX 5090",
       "RTX 5090 بالعربي",
+      "Pokémon RTX 5090",
+      "Kraftwerk RTX 5090",
       "RTX 5090",
       "Beyoncé RTX 5090",
       "RTX 5090 im Test",
@@ -128,9 +128,9 @@ test("search suggestions are ranked without filtering and use the query language
   try {
     const english = await handleApiRequest(request("/api/v1/search/suggestions?q=RTX+5090"), {});
     assert.deepEqual((await english.json()).suggestions, [
-      "RTX 5090",
       "RTX 5090 review",
       "RTX 5090 بالعربي",
+      "RTX 5090",
       "RTX 5090 im Test"
     ]);
     resetRelayState();
@@ -138,9 +138,9 @@ test("search suggestions are ranked without filtering and use the query language
       "/api/v1/search/suggestions?q=" + encodeURIComponent("RTX 5090 بالعربي")
     ), {});
     assert.deepEqual((await arabic.json()).suggestions, [
-      "RTX 5090",
       "RTX 5090 review",
       "RTX 5090 بالعربي",
+      "RTX 5090",
       "RTX 5090 im Test"
     ]);
     assert.equal(seen.length, 2, "each successful suggestions request uses only one provider");
