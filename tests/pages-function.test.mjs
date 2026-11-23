@@ -97,27 +97,34 @@ test("player preserves the original pointer-event interaction model", async () =
   assert.ok(sw.includes("malek-tube-shell-v71"));
 });
 
-test("preloads the first storyboard sprite as soon as current video metadata is available", async () => {
+test("warms storyboard sprites near the current playhead before timeline hover", async () => {
   const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
   const preload = app.slice(
-    app.indexOf("function preloadStoryboardPreview(id){"),
+    app.indexOf("function preloadStoryboardFrame(frame,id,thumb,tw){"),
     app.indexOf("var lastSeekPreviewEvent=null")
   );
   const videoInfo = app.slice(
     app.indexOf("function loadVideoInfo(id){"),
     app.indexOf("function showListMessage(message)")
   );
-  assert.ok(preload.includes("storyboardAt(id,0)"), "warm the initial video-time sprite");
-  assert.ok(preload.includes("storyboardPreviewProxyUrl(key,id)"), "warm the image through the same-origin storyboard relay first");
+  const paint = app.slice(
+    app.indexOf("function paint(t){"),
+    app.indexOf("function seek(t){")
+  );
+  assert.ok(preload.includes("storyboardAt(id,time)"), "warm the sprite containing the current playback position");
+  assert.ok(preload.includes("storyboardAt(id,0)"), "also keep the initial video-time sprite warm");
+  assert.ok(preload.includes("storyboardPreviewProxyUrl(key,id)"), "warm images through the same-origin storyboard relay first");
   assert.ok(preload.includes("entry.image.src=proxyUrl"), "start the same-origin image request before the first seek");
-  assert.ok(preload.includes("entry.image.onerror"), "keep the existing direct-image fallback if the relay image request fails");
-  assert.ok(preload.includes("drawStoryboardPreview(frame,thumb,tw)"), "reuse the existing validated image loader and cache");
+  assert.ok(preload.includes("entry.image.onerror"), "retain the existing image fallback when the relay request fails");
+  assert.ok(preload.includes("drawStoryboardPreview(latest,thumb,tw)"), "retry through the existing validated preview renderer when the active warmup fails");
+  assert.ok(preload.includes("preloadedStoryboardKeys"), "retain only a small rolling set of active sprite keys");
   assert.ok(preload.includes("if(!id||id!==currentVideoId||seekHover)return"), "only warm the active video when the timeline is not being used");
   assert.ok(!preload.includes("fetch("), "preloading must not add a new fetch path");
   assert.ok(!preload.includes("https://"), "preloading must not introduce a new external host");
-  assert.ok(app.includes("function storyboardPreviewProxyUrl(raw,id)"));
+  assert.ok(paint.includes("preloadStoryboardPreview(currentVideoId,t)"), "keep the current playhead sheet warm as playback advances");
   assert.ok(videoInfo.includes("if(id===currentVideoId)preloadStoryboardPreview(id)"), "start preloading as soon as metadata is received");
-  assert.ok(app.includes("var preloadedStoryboardKey=''"), "retain only the active preloaded sheet key");
+  assert.ok(app.includes("function storyboardPreviewProxyUrl(raw,id)"));
+  assert.ok(app.includes("var preloadedStoryboardVideoId='',preloadedStoryboardKeys=[]"));
 });
 
 test("YouTube player iframe keeps a restrictive sandbox", async () => {
