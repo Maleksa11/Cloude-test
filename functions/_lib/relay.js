@@ -425,7 +425,7 @@ function preferredSearchLanguage(query) {
   return /\p{Script=Arabic}/u.test(String(query || "")) ? "ar" : "en";
 }
 const NON_ENGLISH_WORDS = [
-  new Set("der die das den dem des ein eine einen einer einem eines und ist sind war waren geht nicht kein keine mit für auf von zum zur im am ich wir ihr wie warum was wer wo wenn aber auch noch mehr heute jetzt dieser diese dieses weil kann können wird werden deutsch deutsche deutschen folge teil neue besten über unter dir euch mich dich uns guten herzlich willkommen".split(" ")),
+  new Set("der die das den dem des ein eine einen einer einem eines und ist sind war waren geht nicht kein keine mit für auf von zum zur im am ich wir ihr wie warum was wer wo wenn aber auch noch mehr heute morgen gestern jetzt dieser diese dieses weil kann können wird werden wurde wurden muss müssen kannst hat haben habe bin bist seid sein waren folge teil neue besten beste über unter dir euch mich dich uns guten gute nacht ärzte arzte deutschland deutschlands herzlich willkommen schön schöne schöner wunderschön wunderschoen liebe lieber liebt leben welt zeit menschen immer wieder zusammen allein nichts alles einfach sehr morgen kinder leute musik lied lieder sänger saenger song songs nachrichten tagesschau bundesliga fußball fussball spiel spiele spielt spielen tor tore gewinnen verloren meister saison".split(" ")),
   new Set("le la les des du et est sont une un avec pour dans sur pas je tu vous nous que qui comment pourquoi aujourd français française nouvelle nouveau meilleur meilleure chanson paroles musique vidéo cette ces".split(" ")),
   new Set("el los las del y es son una uno un con para que por como hoy qué cómo español española nuevo nueva mejor mejores música canción canciones gracias porque también está están niños niñas esta este".split(" ")),
   new Set("il lo gli della delle del è un una che con per non sono cosa come oggi italiano italiana migliore migliori nuovo nuova canzone canzoni perché questa questo".split(" ")),
@@ -439,7 +439,7 @@ const NON_ENGLISH_WORDS = [
   new Set("je se pro že jak český čeština nový nová".split(" "))
 ];
 const NON_ENGLISH_STRONG_WORDS = new Set(
-  "und nicht fußball fußballer straße deutsch deutsche deutschen herzlich willkommen français française aujourd español española música canción canciones gracias italiano italiana perché canzone português brasileiro brasileira não você vocês türkçe şarkı değil için polski polska się nederlands nederland svenska varför dansk norsk suomi".split(" ")
+  "und nicht fußball fußballer straße deutsch deutsche deutschen deutschland deutschlands herzlich willkommen guten gute nacht ärzte arzte tagesschau nachrichten bundesliga schlager wunderschön wunderschoen französ français française aujourd español española música canción canciones gracias italiano italiana perché canzone português brasileiro brasileira não você vocês türkçe şarkı değil için polski polska się nederlands nederland svenska varför dansk norsk suomi".split(" ")
 );
 function isPreferredSearchText(value, language) {
   const text = String(value || "").normalize("NFKC").trim();
