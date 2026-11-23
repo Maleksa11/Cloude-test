@@ -99,6 +99,8 @@ test("previewFrames that point at another video, another scheme or a stranger's 
 });
 
 test("a second provider is only asked after the first has been silent for the stagger delay", async () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.999999;
   const started = [];
   const t0 = Date.now();
   globalThis.fetch = async (url) => {
@@ -118,6 +120,32 @@ test("a second provider is only asked after the first has been silent for the st
     assert.deepEqual(started.map((entry) => entry.host), [PIPED_HOSTS[0], PIPED_HOSTS[1]]);
     assert.ok(started[1].at >= 1400, "second provider waited for the stagger, got " + started[1].at + "ms");
   } finally {
+    Math.random = originalRandom;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("cold-start search ordering does not always begin with the same provider", async () => {
+  const originalRandom = Math.random;
+  const contacted = [];
+  Math.random = () => 0;
+  globalThis.fetch = async (url) => {
+    const host = new URL(String(url)).hostname;
+    contacted.push(host);
+    return json({
+      items: [{ title: "Available", url: "/watch?v=dQw4w9WgXcQ", duration: 5 }],
+      nextpage: null
+    });
+  };
+  try {
+    const response = await handleApiRequest(
+      request("/api/v1/search?q=music&type=video&page=1&region=JO&hl=en"), {}
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(contacted, [PIPED_HOSTS[1]], "the cold-start provider order is shuffled");
+    assert.equal(contacted.length, 1, "a healthy first provider still serves the request alone");
+  } finally {
+    Math.random = originalRandom;
     globalThis.fetch = originalFetch;
   }
 });
@@ -207,6 +235,8 @@ test("every relay response carries the privacy and isolation headers", async () 
 });
 
 test("providers that never opened a connection do not use up the privacy budget", async () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.999999;
   const contacted = [];
   globalThis.fetch = async (url) => {
     const host = new URL(String(url)).hostname;
@@ -220,6 +250,7 @@ test("providers that never opened a connection do not use up the privacy budget"
     assert.equal(response.status, 200);
     assert.deepEqual(contacted, PIPED_HOSTS.slice(0, 7), "unreachable providers are skipped without limit");
   } finally {
+    Math.random = originalRandom;
     globalThis.fetch = originalFetch;
   }
 });
