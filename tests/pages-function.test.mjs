@@ -389,6 +389,8 @@ test("English suggestions filter German suggestions", async () => {
 });
 
 test("English search skips German-only providers and filters German titles", async () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.999999;
   const seen = [];
   globalThis.fetch = async (url, init) => {
     const target = new URL(String(url));
@@ -418,6 +420,7 @@ test("English search skips German-only providers and filters German titles", asy
     assert.equal(seen.length, 2, "a provider with no English results is followed by exactly one more");
     assert.notEqual(seen[0], seen[1]);
   } finally {
+    Math.random = originalRandom;
     globalThis.fetch = originalFetch;
   }
 });
@@ -768,6 +771,8 @@ test("keeps independent storyboard metadata when every Piped video metadata host
 });
 
 test("fails over sequentially to the next provider when earlier ones are unavailable", async () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.999999;
   const hosts = [];
   globalThis.fetch = async (url) => {
     const host = new URL(String(url)).hostname;
@@ -801,6 +806,7 @@ test("fails over sequentially to the next provider when earlier ones are unavail
     assert.equal(second.status, 200);
     assert.deepEqual(hosts, [PIPED_TEST_HOSTS[3]]);
   } finally {
+    Math.random = originalRandom;
     globalThis.fetch = originalFetch;
   }
 });
