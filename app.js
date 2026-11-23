@@ -46,6 +46,8 @@
   var storyboardCueRequests=Object.create(null);
   var storyboardPreviewRetryAt=Object.create(null);
   var storyboardImageCache=Object.create(null);
+  // Keep only the active video's proactively warmed sprite key.
+  var preloadedStoryboardKey='';
 
   // Opt-in mobile diagnostics: open the preview with ?sbdebug=1.
   var SB_DEBUG=/[?&]sbdebug=1(?:&|$)/.test(location.search);
@@ -338,6 +340,21 @@
     thumb.style.backgroundPosition=(-tileX*scale)+'px '+(-tileY*scale)+'px';
     thumb.style.backgroundRepeat='no-repeat';
   }
+  function preloadStoryboardPreview(id){
+    if(!id||id!==currentVideoId||seekHover)return;
+    var frame=storyboardAt(id,0);
+    if(!frame)return;
+    var thumb=$('seekThumb'),tw=160,key=frame.url;
+    if(!thumb)return;
+    if(preloadedStoryboardKey&&preloadedStoryboardKey!==key){
+      delete storyboardImageCache[preloadedStoryboardKey];
+    }
+    preloadedStoryboardKey=key;
+    thumb.style.width=tw+'px';
+    thumb.style.height=Math.max(54,Math.round(tw*frame.h/frame.w))+'px';
+    thumb.dataset.previewUrl=key;
+    drawStoryboardPreview(frame,thumb,tw);
+  }
   var lastSeekPreviewEvent=null,seekMetadataWaitId='';
   function requestStoryboardPreviewData(id){
     if(!id)return null;
@@ -511,8 +528,9 @@
     if(videoInfoRequests[id])return videoInfoRequests[id];
     if(videoInfoCache[id]){
       var cached=videoInfoCache[id];
+      if(id===currentVideoId)preloadStoryboardPreview(id);
       var cachedRequest=enrichStoryboardData(id,cached).then(function(data){
-        if(id===currentVideoId){applyDurationFallback(id,data);if(currentTab==='recommendations')renderRecommendations(id,data)}
+        if(id===currentVideoId){preloadStoryboardPreview(id);applyDurationFallback(id,data);if(currentTab==='recommendations')renderRecommendations(id,data)}
         return data;
       });
       videoInfoRequests[id]=cachedRequest;
@@ -522,8 +540,9 @@
     var url='/api/v1/videos/'+encodeURIComponent(id)+'?fields=videoId,title,author,lengthSeconds,genre,keywords,storyboards,recommendedVideos(videoId,title,author,lengthSeconds,viewCount,viewCountText,publishedText)&hl=en&region='+DEFAULT_REGION;
     var req=apiGet(url,function(data){return !!(data&&validVideoId(data.videoId))}).then(function(data){
       rememberVideoInfo(id,data);
+      if(id===currentVideoId)preloadStoryboardPreview(id);
       return enrichStoryboardData(id,data).then(function(enriched){
-        if(id===currentVideoId){applyDurationFallback(id,enriched);if(currentTab==='recommendations')renderRecommendations(id,enriched)}
+        if(id===currentVideoId){preloadStoryboardPreview(id);applyDurationFallback(id,enriched);if(currentTab==='recommendations')renderRecommendations(id,enriched)}
         return enriched;
       });
     }).catch(function(err){
