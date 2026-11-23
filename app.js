@@ -45,7 +45,7 @@
   // visitor's IP address or learns which video is being previewed.
   var storyboardCueRequests=Object.create(null);
   var storyboardPreviewRetryAt=Object.create(null);
-  var storyboardImageCache=Object.create(null);
+  var storyboardImageCache=Object.create(null),storyboardImagePreloadRetryAt=Object.create(null);
   // Keep a small rolling set of warmed sprite sheets for the active video.
   var preloadedStoryboardVideoId='',preloadedStoryboardKeys=[];
 
@@ -352,6 +352,9 @@
     if(!frame||!isStoryboardImageUrl(frame.url,id))return '';
     var key=frame.url;
     if(storyboardImageCache[key])return key;
+    var retryAt=storyboardImagePreloadRetryAt[key]||0;
+    if(retryAt>Date.now())return key;
+    if(retryAt)delete storyboardImagePreloadRetryAt[key];
     // Warm the sprite through the same-origin relay first, so the preload does not
     // expose the visitor's IP to YouTube's image host. Direct loading remains the
     // existing fallback if the relay image request fails.
@@ -360,8 +363,12 @@
     var entry=storyboardImageCache[key]={
       loaded:false,failed:false,src:proxyUrl,image:new Image(),fallbackTried:true
     };
-    entry.image.onload=function(){finishStoryboardImageLoad(entry,frame,thumb,tw,key)};
+    entry.image.onload=function(){
+      delete storyboardImagePreloadRetryAt[key];
+      finishStoryboardImageLoad(entry,frame,thumb,tw,key);
+    };
     entry.image.onerror=function(){
+      storyboardImagePreloadRetryAt[key]=Date.now()+15000;
       if(storyboardImageCache[key]===entry)delete storyboardImageCache[key];
       var latest=thumb&&thumb._storyboardFrame;
       if(latest&&latest.videoId===id&&latest.url===key&&thumb.dataset.previewUrl===key){
@@ -381,7 +388,10 @@
     var thumb=$('seekThumb'),tw=160;
     if(!thumb)return;
     if(preloadedStoryboardVideoId!==id){
-      preloadedStoryboardKeys.forEach(function(key){delete storyboardImageCache[key]});
+      preloadedStoryboardKeys.forEach(function(key){
+        delete storyboardImageCache[key];
+        delete storyboardImagePreloadRetryAt[key];
+      });
       preloadedStoryboardKeys=[];
       preloadedStoryboardVideoId=id;
     }
@@ -395,7 +405,10 @@
     }).slice(-1).forEach(function(key){if(keep.indexOf(key)<0)keep.push(key)});
     if(currentKey&&keep.indexOf(currentKey)<0)keep.push(currentKey);
     preloadedStoryboardKeys.forEach(function(key){
-      if(keep.indexOf(key)<0)delete storyboardImageCache[key];
+      if(keep.indexOf(key)<0){
+        delete storyboardImageCache[key];
+        delete storyboardImagePreloadRetryAt[key];
+      }
     });
     preloadedStoryboardKeys=keep;
   }
