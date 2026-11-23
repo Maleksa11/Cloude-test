@@ -46,8 +46,8 @@
   var storyboardCueRequests=Object.create(null);
   var storyboardPreviewRetryAt=Object.create(null);
   var storyboardImageCache=Object.create(null);
-  // Keep only the active video's proactively warmed sprite key.
-  var preloadedStoryboardKey='';
+  // Keep a small rolling set of warmed sprite sheets for the active video.
+  var preloadedStoryboardVideoId='',preloadedStoryboardKeys=[];
 
   // Opt-in mobile diagnostics: open the preview with ?sbdebug=1.
   var SB_DEBUG=/[?&]sbdebug=1(?:&|$)/.test(location.search);
@@ -186,6 +186,7 @@
     var sec=Math.floor(t),currentText=fmt(t),durationText=fmt(dur);
     if(sec!==lastSec||$('tmCurrent').textContent!==currentText){lastSec=sec;$('tmCurrent').textContent=currentText}
     if($('tmDuration').textContent!==durationText)$('tmDuration').textContent=durationText;
+    if(currentVideoId)preloadStoryboardPreview(currentVideoId,t);
   }
   function seek(t){
     if(!Number.isFinite(+t))return;
@@ -347,41 +348,56 @@
     }catch(e){}
     return storyboardImageFallbackUrl(raw,id);
   }
-  function preloadStoryboardPreview(id){
-    if(!id||id!==currentVideoId||seekHover)return;
-    var frame=storyboardAt(id,0);
-    if(!frame)return;
-    var thumb=$('seekThumb'),tw=160,key=frame.url;
-    if(!thumb||!isStoryboardImageUrl(key,id))return;
-    if(preloadedStoryboardKey&&preloadedStoryboardKey!==key){
-      delete storyboardImageCache[preloadedStoryboardKey];
-    }
-    preloadedStoryboardKey=key;
-    thumb.style.width=tw+'px';
-    thumb.style.height=Math.max(54,Math.round(tw*frame.h/frame.w))+'px';
-    thumb.dataset.previewUrl=key;
-    thumb._storyboardFrame=frame;
-    if(storyboardImageCache[key]){
-      drawStoryboardPreview(frame,thumb,tw);
-      return;
-    }
+  function preloadStoryboardFrame(frame,id,thumb,tw){
+    if(!frame||!isStoryboardImageUrl(frame.url,id))return '';
+    var key=frame.url;
+    if(storyboardImageCache[key])return key;
     // Warm the sprite through the same-origin relay first, so the preload does not
     // expose the visitor's IP to YouTube's image host. Direct loading remains the
     // existing fallback if the relay image request fails.
     var proxyUrl=storyboardPreviewProxyUrl(key,id);
-    if(!proxyUrl||proxyUrl===key){
-      drawStoryboardPreview(frame,thumb,tw);
-      return;
-    }
+    if(!proxyUrl||proxyUrl===key)return '';
     var entry=storyboardImageCache[key]={
       loaded:false,failed:false,src:proxyUrl,image:new Image(),fallbackTried:true
     };
     entry.image.onload=function(){finishStoryboardImageLoad(entry,frame,thumb,tw,key)};
     entry.image.onerror=function(){
       if(storyboardImageCache[key]===entry)delete storyboardImageCache[key];
-      drawStoryboardPreview(frame,thumb,tw);
+      var latest=thumb&&thumb._storyboardFrame;
+      if(latest&&latest.videoId===id&&latest.url===key&&thumb.dataset.previewUrl===key){
+        drawStoryboardPreview(latest,thumb,tw);
+      }
     };
     entry.image.src=proxyUrl;
+    return key;
+  }
+  function preloadStoryboardPreview(id,seconds){
+    if(!id||id!==currentVideoId||seekHover)return;
+    var time=Number(seconds);
+    if(!Number.isFinite(time))time=Number(tcur)||0;
+    time=Math.max(0,time);
+    var currentFrame=storyboardAt(id,time),firstFrame=storyboardAt(id,0);
+    if(!currentFrame&&!firstFrame)return;
+    var thumb=$('seekThumb'),tw=160;
+    if(!thumb)return;
+    if(preloadedStoryboardVideoId!==id){
+      preloadedStoryboardKeys.forEach(function(key){delete storyboardImageCache[key]});
+      preloadedStoryboardKeys=[];
+      preloadedStoryboardVideoId=id;
+    }
+    var firstKey=preloadStoryboardFrame(firstFrame,id,thumb,tw);
+    var currentKey=preloadStoryboardFrame(currentFrame,id,thumb,tw);
+    // Keep the first sheet and the two most recently used playhead sheets.
+    var keep=[];
+    if(firstKey)keep.push(firstKey);
+    preloadedStoryboardKeys.filter(function(key){
+      return key!==firstKey&&key!==currentKey;
+    }).slice(-1).forEach(function(key){if(keep.indexOf(key)<0)keep.push(key)});
+    if(currentKey&&keep.indexOf(currentKey)<0)keep.push(currentKey);
+    preloadedStoryboardKeys.forEach(function(key){
+      if(keep.indexOf(key)<0)delete storyboardImageCache[key];
+    });
+    preloadedStoryboardKeys=keep;
   }
   var lastSeekPreviewEvent=null,seekMetadataWaitId='';
   function requestStoryboardPreviewData(id){
