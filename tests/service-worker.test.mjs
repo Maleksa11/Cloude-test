@@ -109,12 +109,13 @@ test("shell files are network-first with an offline fallback, regardless of the 
 test("activating a new version deletes older shell caches and nothing else", async () => {
   const worker = await loadWorker(online);
   await worker.caches.open("malek-tube-shell-v70");
+  await worker.caches.open("malek-tube-shell-v71");
   await worker.caches.open("malek-tube-shell-v72");
   await worker.caches.open("unrelated-cache");
   let finished = null;
   worker.listeners.activate({ waitUntil: (promise) => { finished = promise; } });
   await finished;
-  assert.deepEqual([...worker.stores.keys()].sort(), ["unrelated-cache"]);
+  assert.deepEqual([...worker.stores.keys()].sort(), ["malek-tube-shell-v72", "unrelated-cache"]);
 });
 
 test("the page registers exactly this worker through a Trusted Types policy", async () => {
