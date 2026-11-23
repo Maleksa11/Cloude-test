@@ -411,9 +411,11 @@ test("Piped suggestions are normalized to the app response shape", async () => {
   }
 });
 
-test("English suggestions filter German suggestions", async () => {
+test("English suggestions rank English first and keep German suggestions", async () => {
+  let calls = 0;
   globalThis.fetch = async (url, init) => {
     const target = new URL(String(url));
+    calls++;
     assert.equal(target.pathname, "/suggestions");
     assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US,en;q=0.9");
     return new Response(JSON.stringify(["Fußball spielen", "Best football goals", "Die besten Tore"]), {
@@ -423,28 +425,26 @@ test("English suggestions filter German suggestions", async () => {
   try {
     const response = await onRequest(context("/api/v1/search/suggestions?q=football", { Origin: SITE }));
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { suggestions: ["Best football goals"] });
+    assert.deepEqual(await response.json(), {
+      suggestions: ["Best football goals", "Fußball spielen", "Die besten Tore"]
+    });
+    assert.equal(calls, 1, "a healthy provider is not retried because suggestions are in another language");
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("English search skips German-only providers and filters German titles", async () => {
-  const originalRandom = Math.random;
-  Math.random = () => 0.999999;
+test("English search keeps foreign results after ranking and does not retry on language mismatch", async () => {
   const seen = [];
   globalThis.fetch = async (url, init) => {
     const target = new URL(String(url));
     seen.push(target.hostname);
     assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US,en;q=0.9");
-    const isGermanOnly = target.hostname === PIPED_TEST_HOSTS[0];
-    const titles = isGermanOnly
-      ? ["Die besten Fußball Momente", "Warum ist das so?"]
-      : ["Best football moments", "How this game changed everything"];
     return new Response(JSON.stringify({
-      items: titles.map((title, index) => ({
-        title, url: "/watch?v=" + (index ? "9bZkp7q19f0" : "dQw4w9WgXcQ"), duration: 10
-      })),
+      items: [
+        { title: "Die besten Fußball Momente", url: "/watch?v=dQw4w9WgXcQ", duration: 10 },
+        { title: "Warum ist das so?", url: "/watch?v=9bZkp7q19f0", duration: 10 }
+      ],
       nextpage: "english-next-page"
     }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
@@ -455,18 +455,18 @@ test("English search skips German-only providers and filters German titles", asy
     ));
     const data = await response.json();
     assert.equal(response.status, 200);
-    assert.equal(data.items.length, 2);
-    assert.equal(data.items.every((item) => !/fußball|\bder\b|\bdie\b|\bdas\b|\bund\b/i.test(item.title)), true);
-    assert.equal(data.items[0].title, "Best football moments");
-    assert.equal(seen.length, 2, "a provider with no English results is followed by exactly one more");
-    assert.notEqual(seen[0], seen[1]);
+    assert.deepEqual(data.items.map((item) => item.title), [
+      "Die besten Fußball Momente",
+      "Warum ist das so?"
+    ]);
+    assert.equal(data.nextPage, "english-next-page");
+    assert.equal(seen.length, 1, "a healthy provider is not retried just because its result language differs");
   } finally {
-    Math.random = originalRandom;
     globalThis.fetch = originalFetch;
   }
 });
 
-test("Arabic search sends Arabic preference and returns Arabic titles only", async () => {
+test("Arabic search ranks Arabic first and keeps English titles", async () => {
   const seenHeaders = [];
   globalThis.fetch = async (url, init) => {
     const target = new URL(String(url));
@@ -474,8 +474,8 @@ test("Arabic search sends Arabic preference and returns Arabic titles only", asy
     seenHeaders.push(new Headers(init.headers).get("Accept-Language"));
     return new Response(JSON.stringify({
       items: [
-        { title: "أفضل أهداف كرة القدم", url: "/watch?v=dQw4w9WgXcQ", duration: 10 },
-        { title: "Best football highlights", url: "/watch?v=9bZkp7q19f0", duration: 10 }
+        { title: "Best football highlights", url: "/watch?v=9bZkp7q19f0", duration: 10 },
+        { title: "أفضل أهداف كرة القدم", url: "/watch?v=dQw4w9WgXcQ", duration: 10 }
       ],
       nextpage: null
     }), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -487,8 +487,10 @@ test("Arabic search sends Arabic preference and returns Arabic titles only", asy
     ));
     const data = await response.json();
     assert.equal(response.status, 200);
-    assert.equal(data.items.length, 1);
-    assert.equal(data.items[0].title, "أفضل أهداف كرة القدم");
+    assert.deepEqual(data.items.map((item) => item.title), [
+      "أفضل أهداف كرة القدم",
+      "Best football highlights"
+    ]);
     assert.equal(seenHeaders.length, 1);
     assert.equal(seenHeaders.every((value) => value === "ar,en;q=0.9"), true);
   } finally {

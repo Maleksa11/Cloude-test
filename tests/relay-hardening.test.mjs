@@ -78,7 +78,7 @@ test("search ranks English, Arabic and neutral titles first without dropping oth
     { title: "RTX 5090 review and benchmark", url: "/watch?v=jfKfPfyJRdk", duration: 5 },
     { title: "Kraftwerk RTX 5090", url: "/watch?v=aqz-KE-bpKQ", duration: 5 },
     { title: "RTX 5090 بالعربي", url: "/watch?v=ScMzIvxBSi4", duration: 5 },
-    { title: "Founders Edition Review - Brutale Leistung", url: "/watch?v=Zi_XLOBDo_YU", duration: 5 },
+    { title: "Founders Edition Review - Brutale Leistung", url: "/watch?v=Zi_XLOBDo_Y", duration: 5 },
     { title: "RTX 5090", url: "/watch?v=kJQP7kiw5Fk", duration: 5 },
     { title: "Beyoncé RTX 5090", url: "/watch?v=M7lc1UVf-VE", duration: 5 },
     { title: "bauen Anleitung RTX 5090", url: "/watch?v=L_jWHffIx5E", duration: 5 },
