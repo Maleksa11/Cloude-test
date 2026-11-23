@@ -70,6 +70,72 @@ test("storyboards come from Piped's own previewFrames, so no extra provider lear
   }
 });
 
+test("storyboard image relay streams bytes before the upstream image finishes", async () => {
+  let releaseStream;
+  let upstreamFinished = false;
+  const gate = new Promise((resolve) => { releaseStream = resolve; });
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    async pull(controller) {
+      await gate;
+      controller.enqueue(new Uint8Array([1, 2, 3, 4]));
+      controller.close();
+      upstreamFinished = true;
+    }
+  }), { status: 200, headers: { "Content-Type": "image/jpeg" } });
+
+  try {
+    const url = "https://i.ytimg.com/sb/dQw4w9WgXcQ/storyboard3_L2/M0.jpg?sigh=def&sqp=abc";
+    const responsePromise = handleApiRequest(
+      request("/api/storyboard?url=" + encodeURIComponent(url)), {}
+    );
+    let timer;
+    const early = await Promise.race([
+      responsePromise.then((response) => ({ response })),
+      new Promise((resolve) => { timer = setTimeout(() => resolve(null), 120); })
+    ]);
+    clearTimeout(timer);
+    releaseStream();
+    const response = early ? early.response : await responsePromise;
+    assert.ok(early, "the relay must return a streaming response without buffering the whole sprite");
+    assert.equal(upstreamFinished, false, "the upstream body is still streaming when headers reach the caller");
+    assert.equal(response.status, 200);
+    assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1, 2, 3, 4]);
+    assert.equal(upstreamFinished, true);
+  } finally {
+    releaseStream();
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("video recommendations keep English and Arabic and reject German titles", async () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.999999;
+  const relatedStreams = [
+    { title: "Best football moments", url: "/watch?v=dQw4w9WgXcQ", duration: 10 },
+    { title: "أفضل أهداف كرة القدم", url: "/watch?v=9bZkp7q19f0", duration: 10 },
+    { title: "Die besten Fußball Momente", url: "/watch?v=BaW_jenozKc", duration: 10 },
+    { title: "Gute Nacht", url: "/watch?v=aqz-KE-bpKQ", duration: 10 },
+    { title: "Ärzte Live in Berlin", url: "/watch?v=jfKfPfyJRdk", duration: 10 }
+  ];
+  globalThis.fetch = async () => json(pipedVideo({
+    previewFrames: previewFrames("dQw4w9WgXcQ"),
+    relatedStreams
+  }));
+
+  try {
+    const response = await handleApiRequest(request(VIDEO_PATH), {});
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(data.recommendedVideos.map((video) => video.title), [
+      "Best football moments",
+      "أفضل أهداف كرة القدم"
+    ]);
+  } finally {
+    Math.random = originalRandom;
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("previewFrames that point at another video, another scheme or a stranger's path are ignored", async () => {
   const bad = [
     { urls: ["https://p.example/sb/AAAAAAAAAAA/storyboard3_L1/M0.jpg?sigh=a"], frameWidth: 80, frameHeight: 45, totalCount: 10, durationPerFrame: 1000, framesPerPageX: 10, framesPerPageY: 10 },
