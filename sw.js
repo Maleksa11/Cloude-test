@@ -2,7 +2,7 @@
 
 // The service worker caches the app shell only, so the app can open offline.
 // It never touches /api/*, search results, video data or anything user-specific.
-const CACHE_NAME = 'malek-tube-shell-v71';
+const CACHE_NAME = 'malek-tube-shell-v72';
 const SHELL_FILES = ['./index.html', './app.js', './style.css', './manifest.webmanifest', './icon.svg'];
 const SHELL_INDEX = new URL('./index.html', self.location.href).href;
 // Only these navigations are the app shell. Any other page (for example privacy.html)

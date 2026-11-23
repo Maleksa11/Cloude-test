@@ -90,11 +90,11 @@ test("player preserves the original pointer-event interaction model", async () =
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.ok(html.includes('<div id="touch"></div>'));
   assert.ok(!html.includes('<button id="touch"'));
-  assert.ok(html.includes("style.css?v=71"));
-  assert.ok(html.includes("app.js?v=71"));
+  assert.ok(html.includes("style.css?v=72"));
+  assert.ok(html.includes("app.js?v=72"));
 
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.ok(sw.includes("malek-tube-shell-v71"));
+  assert.ok(sw.includes("malek-tube-shell-v72"));
 });
 
 test("warms storyboard sprites near the current playhead before timeline hover", async () => {
@@ -397,7 +397,7 @@ test("Piped suggestions are normalized to the app response shape", async () => {
     assert.equal(PIPED_TEST_HOSTS.includes(target.hostname), true);
     assert.equal(target.pathname, "/suggestions");
     assert.equal(target.searchParams.get("query"), "privacy");
-    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US,en;q=0.9");
+    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US;q=0.9,en;q=0.9,ar;q=0.9");
     return new Response(JSON.stringify(["privacy", "privacy browser"]), {
       status: 200, headers: { "Content-Type": "application/json" }
     });
@@ -417,7 +417,7 @@ test("English suggestions rank English first and keep German suggestions", async
     const target = new URL(String(url));
     calls++;
     assert.equal(target.pathname, "/suggestions");
-    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US,en;q=0.9");
+    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US;q=0.9,en;q=0.9,ar;q=0.9");
     return new Response(JSON.stringify(["Fußball spielen", "Best football goals", "Die besten Tore"]), {
       status: 200, headers: { "Content-Type": "application/json" }
     });
@@ -439,7 +439,7 @@ test("English search keeps foreign results after ranking and does not retry on l
   globalThis.fetch = async (url, init) => {
     const target = new URL(String(url));
     seen.push(target.hostname);
-    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US,en;q=0.9");
+    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US;q=0.9,en;q=0.9,ar;q=0.9");
     return new Response(JSON.stringify({
       items: [
         { title: "Die besten Fußball Momente", url: "/watch?v=dQw4w9WgXcQ", duration: 10 },

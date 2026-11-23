@@ -7,6 +7,14 @@ const INVIDIOUS_HOSTS = [
   "yt.chocolatemoo53.com",
   "invidious.tiekoetter.com"
 ];
+// Match the previous player's first-choice order for timeline metadata, while
+// keeping relay-only requests and the existing three-provider retry budget.
+const INVIDIOUS_PREFERRED_HOSTS = [
+  "yt.chocolatemoo53.com",
+  "invidious.tiekoetter.com",
+  "invidious.nerdvpn.de",
+  "inv.nadeko.net"
+];
 const PIPED_HOSTS = [
   "pipedapi.kavin.rocks",
   "api.piped.yt",
@@ -90,8 +98,9 @@ function shuffleHosts(hosts) {
   return shuffled;
 }
 
-function orderHosts(hosts) {
+function orderHosts(hosts, preferredHosts = []) {
   const now = Date.now();
+  const preferredRanks = new Map(preferredHosts.map((host, index) => [host, index]));
   const entries = hosts.map((host, index) => {
     const state = hostState.get(host);
     const rank = !state ? 1 : state.badUntil > now ? 2 : state.lastGoodAt ? 0 : 1;
@@ -105,12 +114,17 @@ function orderHosts(hosts) {
     .filter((entry) => entry.rank === 0)
     .sort((a, b) => b.good - a.good || a.index - b.index)
     .map((entry) => entry.host);
+  const preferKnownOrder = (a, b) =>
+    (preferredRanks.get(a) ?? Number.MAX_SAFE_INTEGER) -
+    (preferredRanks.get(b) ?? Number.MAX_SAFE_INTEGER);
   const untested = shuffleHosts(entries
     .filter((entry) => entry.rank === 1)
-    .map((entry) => entry.host));
+    .map((entry) => entry.host))
+    .sort(preferKnownOrder);
   const coolingDown = shuffleHosts(entries
     .filter((entry) => entry.rank === 2)
-    .map((entry) => entry.host));
+    .map((entry) => entry.host))
+    .sort(preferKnownOrder);
 
   return [...knownGood, ...untested, ...coolingDown];
 }
@@ -159,7 +173,7 @@ async function hedgedRace(hosts, attempt, options = {}) {
   // attempts are refunded: dead providers cost time, not privacy.
   const budget = options.maxAttempts ?? HEDGE_MAX_ATTEMPTS;
   const deadline = Date.now() + (options.deadlineMs ?? HEDGE_DEADLINE_MS);
-  const list = orderHosts(hosts);
+  const list = orderHosts(hosts, options.preferredHosts || []);
   return new Promise((resolve) => {
     const failures = [];
     let next = 0, inFlight = 0, used = 0, done = false, timer = 0;
@@ -322,9 +336,11 @@ function safeStoryboardTarget(raw, expectedVideoId) {
 function privacyHeaders(accept, language = "en") {
   // Build fresh headers; never copy visitor IP, cookie, authorization, or referrer headers.
   // Cloudflare sends this as a Worker subrequest rather than forwarding the browser request.
+  const acceptLanguage = language === "ar" ? "ar,en;q=0.9" :
+    language === "en-ar" ? "en-US;q=0.9,en;q=0.9,ar;q=0.9" : "en-US,en;q=0.9";
   return new Headers({
     "Accept": accept,
-    "Accept-Language": language === "ar" ? "ar,en;q=0.9" : "en-US,en;q=0.9",
+    "Accept-Language": acceptLanguage,
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
   });
 }
@@ -472,13 +488,18 @@ function isPreferredRecommendationText(value) {
 // stay neutral in the middle tier instead of being guessed from product names
 // from a product name such as "RTX 5090".
 const ENGLISH_SEARCH_WORDS = new Set(
-  "review benchmark unboxing gaming gameplay tutorial explained guide comparison best how the new official setup performance first look build pc video news update full walkthrough trailer specs price launch hands-on hands on".split(" ")
+  "review benchmark unboxing gaming gameplay tutorial explained guide comparison best how the new official setup performance first look build pc video news update full walkthrough trailer specs price launch hands-on hands on the this these those is it worth does can should will what why which from under over vs versus compared tested latest check buying buy gpu graphics card nvidia geforce".split(" ")
 );
 const CONFIRMED_OTHER_LANGUAGE_WORDS = new Set([
   ...NON_ENGLISH_STRONG_WORDS,
   "leistung", "leistungen", "brutale", "praxistest", "anleitung", "bauen",
   "kaufberatung", "vergleich", "vergleichstest", "grafikkarte", "treiber",
-  "kuhlung", "kühlung", "übertaktung", "prueba", "reseña", "analisis",
+  "kuhlung", "kühlung", "übertaktung", "vorstellung", "testbericht", "testberichte",
+  "leistungstest", "verbrauch", "energieverbrauch", "lautstärke", "lautstaerke",
+  "lüfter", "luefter", "temperatur", "temperaturen", "verfügbar", "verfuegbar",
+  "verfügbarkeit", "verfuegbarkeit", "empfehlung", "empfehlenswert", "günstig",
+  "guenstig", "günstiger", "guenstiger", "beste", "besten", "neue", "neuen",
+  "für", "über", "gegenüber", "gegenueber", "prueba", "reseña", "analisis",
   "análisis", "comparativa", "recensione", "confronto", "migliore",
   "meilleur", "meilleure", "essai"
 ]);
@@ -574,7 +595,7 @@ async function proxyPipedSearch(url) {
   const result = await fetchPiped(
     path,
     (data) => !!data && typeof data === "object" && !Array.isArray(data) && Array.isArray(data.items),
-    language
+    language === "ar" ? "ar" : "en-ar"
   );
   if (!result.ok) {
     console.warn("[MTube relay] All Piped search providers failed:", result.failures);
@@ -592,7 +613,11 @@ async function proxyPipedSearch(url) {
 async function proxyPipedSuggestions(query) {
   const params = new URLSearchParams({ query });
   const language = preferredSearchLanguage(query);
-  const result = await fetchPiped("/suggestions?" + params.toString(), Array.isArray, language);
+  const result = await fetchPiped(
+    "/suggestions?" + params.toString(),
+    Array.isArray,
+    language === "ar" ? "ar" : "en-ar"
+  );
   if (!result.ok) {
     console.warn("[MTube relay] All Piped suggestion providers failed:", result.failures);
     return jsonResponse({ error: "Search suggestions are temporarily unavailable.", ...publicDiagnostics("providers", result.failures) }, 503);
@@ -813,7 +838,7 @@ async function proxyStoryboardVtt(videoId, width, height, region = "JO") {
     } catch (error) {
       return { ok: false, failure: { host, status: 0, reason: storyboardFailureReason(error) } };
     }
-  }, { group: "invidious" });
+  }, { group: "invidious", preferredHosts: INVIDIOUS_PREFERRED_HOSTS });
   if (result.ok) return jsonResponse(result.cues);
   console.warn("[MTube relay] Storyboard VTT unavailable for", videoId, result.failures);
   return jsonResponse({
@@ -840,7 +865,7 @@ async function fetchStoryboardFromInvidious(videoId, path, diag) {
       return { ok: false, soft: true, failure: { host, status: "no-storyboards" } };
     }
     return { ok: true, boards };
-  }, { group: "invidious", maxAttempts: 3 });
+  }, { group: "invidious", maxAttempts: 3, preferredHosts: INVIDIOUS_PREFERRED_HOSTS });
   return result.ok ? result.boards : [];
 }
 

@@ -70,6 +70,37 @@ test("storyboards come from Piped's own previewFrames, so no extra provider lear
   }
 });
 
+test("storyboard fallback follows the old player's preferred Invidious order without widening provider fan-out", async () => {
+  const seen = [];
+  globalThis.fetch = async (url) => {
+    const target = new URL(String(url));
+    seen.push(target.hostname);
+    if (PIPED_HOSTS.includes(target.hostname)) return json(pipedVideo());
+    if (target.hostname === "yt.chocolatemoo53.com") {
+      return json({
+        storyboards: [{
+          templateUrl: "https://yt.chocolatemoo53.com/sb/i/dQw4w9WgXcQ/storyboard3_L2/M$M.jpg?sqp=a&sigh=b",
+          width: 160, height: 90, count: 60, interval: 10000,
+          storyboardWidth: 5, storyboardHeight: 5, storyboardCount: 3
+        }]
+      });
+    }
+    throw new Error("Unexpected upstream host: " + target.hostname);
+  };
+  try {
+    const response = await handleApiRequest(request(VIDEO_PATH), {});
+    const data = await response.json();
+    const invidiousSeen = seen.filter((host) => INVIDIOUS_HOSTS.includes(host));
+    assert.equal(response.status, 200);
+    assert.deepEqual(invidiousSeen, ["yt.chocolatemoo53.com"]);
+    assert.equal(data.storyboards.length, 1);
+    assert.equal(new URL(data.storyboards[0].templateUrl).hostname, "i.ytimg.com");
+    assert.equal(data.cuesRecommended, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("search ranks English, Arabic and neutral titles first without dropping other languages", async () => {
   const source = [
     { title: "RTX 5090 im Test", url: "/watch?v=dQw4w9WgXcQ", duration: 5 },
@@ -83,7 +114,9 @@ test("search ranks English, Arabic and neutral titles first without dropping oth
     { title: "RTX 5090 Test", url: "/watch?v=kxopViU98Xo", duration: 5 },
     { title: "Beyoncé RTX 5090", url: "/watch?v=M7lc1UVf-VE", duration: 5 },
     { title: "bauen Anleitung RTX 5090", url: "/watch?v=L_jWHffIx5E", duration: 5 },
-    { title: "東京 RTX 5090", url: "/watch?v=oHg5SJYRHA0", duration: 5 }
+    { title: "東京 RTX 5090", url: "/watch?v=oHg5SJYRHA0", duration: 5 },
+    { title: "RTX 5090 – Vorstellung, Verbrauch und Lautstärke", url: "/watch?v=QH2-TGUlwu4", duration: 5 },
+    { title: "RTX 5090 – Is it worth buying?", url: "/watch?v=L3wKzyIN1yk", duration: 5 }
   ];
   const calls = [];
   globalThis.fetch = async (url, init) => {
@@ -99,6 +132,7 @@ test("search ranks English, Arabic and neutral titles first without dropping oth
     assert.deepEqual(data.items.map((video) => video.title), [
       "RTX 5090 review and benchmark",
       "RTX 5090 بالعربي",
+      "RTX 5090 – Is it worth buying?",
       "Pokémon RTX 5090",
       "Kraftwerk RTX 5090",
       "RTX 5090",
@@ -108,13 +142,14 @@ test("search ranks English, Arabic and neutral titles first without dropping oth
       "Praxistest RTX 5090",
       "Founders Edition Review - Brutale Leistung",
       "bauen Anleitung RTX 5090",
-      "東京 RTX 5090"
+      "東京 RTX 5090",
+      "RTX 5090 – Vorstellung, Verbrauch und Lautstärke"
     ]);
     assert.equal(data.items.length, source.length, "language ranking must not discard search results");
     assert.equal(data.nextPage, "opaque-next-page", "the opaque pagination cursor must be returned unchanged");
     assert.equal(calls.length, 1, "a healthy provider with mixed-language results must receive only one search request");
     assert.ok(PIPED_HOSTS.includes(calls[0].url.hostname));
-    assert.equal(calls[0].headers.get("accept-language"), "en-US,en;q=0.9");
+    assert.equal(calls[0].headers.get("accept-language"), "en-US;q=0.9,en;q=0.9,ar;q=0.9");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -146,7 +181,7 @@ test("search suggestions are ranked without filtering and use the query language
       "RTX 5090 im Test"
     ]);
     assert.equal(seen.length, 2, "each successful suggestions request uses only one provider");
-    assert.equal(seen[0].headers.get("accept-language"), "en-US,en;q=0.9");
+    assert.equal(seen[0].headers.get("accept-language"), "en-US;q=0.9,en;q=0.9,ar;q=0.9");
     assert.equal(seen[1].headers.get("accept-language"), "ar,en;q=0.9");
   } finally {
     globalThis.fetch = originalFetch;
