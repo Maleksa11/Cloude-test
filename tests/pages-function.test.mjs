@@ -474,8 +474,8 @@ test("Arabic search ranks Arabic first and keeps English titles", async () => {
     seenHeaders.push(new Headers(init.headers).get("Accept-Language"));
     return new Response(JSON.stringify({
       items: [
-        { title: "Best football highlights", url: "/watch?v=9bZkp7q19f0", duration: 10 },
-        { title: "أفضل أهداف كرة القدم", url: "/watch?v=dQw4w9WgXcQ", duration: 10 }
+        { title: "أفضل أهداف كرة القدم", url: "/watch?v=dQw4w9WgXcQ", duration: 10 },
+        { title: "Best football highlights", url: "/watch?v=9bZkp7q19f0", duration: 10 }
       ],
       nextpage: null
     }), { status: 200, headers: { "Content-Type": "application/json" } });
