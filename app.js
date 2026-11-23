@@ -300,8 +300,8 @@
       if(isRelay){
         // Preserve the old direct-image fallback, but only after the privacy relay
         // has failed. Normal preview and preload requests always try same-origin first.
-        var directUrl=storyboardImageFallbackUrl(key,frame.videoId);
-        if(directUrl){
+        var directUrl=storyboardImageDirectUrl(key,frame.videoId);
+        if(directUrl&&directUrl!==source){
           entry.failed=false;
           startStoryboardImageLoad(entry,frame,thumb,tw,key,directUrl,false);
           return;
@@ -367,6 +367,17 @@
       if(u.origin===location.origin&&u.pathname==='/api/storyboard')return u.pathname+u.search;
     }catch(e){}
     return storyboardImageFallbackUrl(raw,id);
+  }
+  function storyboardImageDirectUrl(raw,id){
+    try{
+      var u=new URL(raw,location.origin);
+      if(u.origin===location.origin&&u.pathname==='/api/storyboard'){
+        var nested=u.searchParams.get('url');
+        return nested&&isStoryboardImageUrl(nested,id)?new URL(nested).href:'';
+      }
+      return u.origin!==location.origin&&isStoryboardImageUrl(u.href,id)?u.href:'';
+    }catch(e){}
+    return '';
   }
   function preloadStoryboardFrame(frame,id,thumb,tw){
     if(!frame||!isStoryboardImageUrl(frame.url,id))return '';
