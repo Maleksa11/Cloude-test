@@ -97,6 +97,24 @@ test("player preserves the original pointer-event interaction model", async () =
   assert.ok(sw.includes("malek-tube-shell-v71"));
 });
 
+test("preloads the first storyboard sprite as soon as current video metadata is available", async () => {
+  const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  const preload = app.slice(
+    app.indexOf("function preloadStoryboardPreview(id){"),
+    app.indexOf("var lastSeekPreviewEvent=null")
+  );
+  const videoInfo = app.slice(
+    app.indexOf("function loadVideoInfo(id){"),
+    app.indexOf("function showListMessage(message)")
+  );
+  assert.ok(preload.includes("storyboardAt(id,0)"), "warm the initial video-time sprite");
+  assert.ok(preload.includes("drawStoryboardPreview(frame,thumb,tw)"), "use the existing validated image loader and cache");
+  assert.ok(preload.includes("if(!id||id!==currentVideoId||seekHover)return"), "only warm the active video when the timeline is not being used");
+  assert.ok(!preload.includes("fetch("), "preloading must not add a new fetch path");
+  assert.ok(!preload.includes("https://"), "preloading must not introduce a new external host");
+  assert.ok(videoInfo.includes("if(id===currentVideoId)preloadStoryboardPreview(id)"), "start preloading as soon as metadata is received");
+  assert.ok(app.includes("var preloadedStoryboardKey=''"), "retain only the active preloaded sheet key");
+});
 
 test("YouTube player iframe keeps a restrictive sandbox", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
