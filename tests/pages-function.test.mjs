@@ -104,7 +104,7 @@ test("warms storyboard sprites near the current playhead before timeline hover",
     app.indexOf("var lastSeekPreviewEvent=null")
   );
   const imageLoader = app.slice(
-    app.indexOf("function startStoryboardImageLoad(entry,frame,thumb,tw,key,source,isRelay){"),
+    app.indexOf("function startStoryboardImageLoad(entry,frame,thumb,tw,key,source,isRelay,priority){"),
     app.indexOf("function drawStoryboardPreview(frame,thumb,tw){")
   );
   const drawPreview = app.slice(

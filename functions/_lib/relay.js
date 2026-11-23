@@ -484,23 +484,23 @@ const CONFIRMED_OTHER_LANGUAGE_WORDS = new Set([
 ]);
 function languageTier(value) {
   const text = String(value || "").normalize("NFKC").trim();
-  const letters = Array.from(text).filter((character) => /\\p{L}/u.test(character));
+  const letters = Array.from(text).filter((character) => /\p{L}/u.test(character));
   if (!letters.length) return "neutral";
 
-  const arabicCount = letters.filter((character) => /\\p{Script=Arabic}/u.test(character)).length;
+  const arabicCount = letters.filter((character) => /\p{Script=Arabic}/u.test(character)).length;
   if (arabicCount >= 2 && arabicCount / letters.length >= 0.2) return "preferred";
 
   // A non-Latin, non-Arabic script is positive evidence of another language.
   if (letters.some((character) =>
-    !/\\p{Script=Latin}/u.test(character) && !/\\p{Script=Arabic}/u.test(character)
+    !/\p{Script=Latin}/u.test(character) && !/\p{Script=Arabic}/u.test(character)
   )) return "other";
 
-  const rawWords = text.toLowerCase().match(/\\p{L}+/gu) || [];
-  const normalizedWords = text.normalize("NFD").replace(/\\p{M}/gu, "").toLowerCase().match(/\\p{L}+/gu) || [];
+  const rawWords = text.toLowerCase().match(/\p{L}+/gu) || [];
+  const normalizedWords = text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().match(/\p{L}+/gu) || [];
   const words = new Set([...rawWords, ...normalizedWords]);
 
   if ([...words].some((word) => CONFIRMED_OTHER_LANGUAGE_WORDS.has(word))) return "other";
-  if (/\\bim\\s+(?:test|vergleich|benchmark)\\b|\\b(?:praxistest|anleitung|kaufberatung|brutale\\s+leistung)\\b/i.test(text)) {
+  if (/\bim\s+(?:test|vergleich|benchmark)\b|\b(?:praxistest|anleitung|kaufberatung|brutale\s+leistung)\b/i.test(text)) {
     return "other";
   }
   for (const markers of NON_ENGLISH_WORDS) {
