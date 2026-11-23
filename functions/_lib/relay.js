@@ -472,7 +472,7 @@ function isPreferredRecommendationText(value) {
 // stay neutral in the middle tier instead of being guessed from product names
 // from a product name such as "RTX 5090".
 const ENGLISH_SEARCH_WORDS = new Set(
-  "review benchmark unboxing gaming gameplay tutorial explained guide comparison best how the new official setup performance first look build pc video news update full walkthrough trailer specs price launch hands-on hands on test".split(" ")
+  "review benchmark unboxing gaming gameplay tutorial explained guide comparison best how the new official setup performance first look build pc video news update full walkthrough trailer specs price launch hands-on hands on".split(" ")
 );
 const CONFIRMED_OTHER_LANGUAGE_WORDS = new Set([
   ...NON_ENGLISH_STRONG_WORDS,

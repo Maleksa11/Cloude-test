@@ -80,6 +80,7 @@ test("search ranks English, Arabic and neutral titles first without dropping oth
     { title: "RTX 5090 بالعربي", url: "/watch?v=ScMzIvxBSi4", duration: 5 },
     { title: "Founders Edition Review - Brutale Leistung", url: "/watch?v=Zi_XLOBDo_Y", duration: 5 },
     { title: "RTX 5090", url: "/watch?v=kJQP7kiw5Fk", duration: 5 },
+    { title: "RTX 5090 Test", url: "/watch?v=kxopViU98Xo", duration: 5 },
     { title: "Beyoncé RTX 5090", url: "/watch?v=M7lc1UVf-VE", duration: 5 },
     { title: "bauen Anleitung RTX 5090", url: "/watch?v=L_jWHffIx5E", duration: 5 },
     { title: "東京 RTX 5090", url: "/watch?v=oHg5SJYRHA0", duration: 5 }
@@ -101,6 +102,7 @@ test("search ranks English, Arabic and neutral titles first without dropping oth
       "Pokémon RTX 5090",
       "Kraftwerk RTX 5090",
       "RTX 5090",
+      "RTX 5090 Test",
       "Beyoncé RTX 5090",
       "RTX 5090 im Test",
       "Praxistest RTX 5090",
