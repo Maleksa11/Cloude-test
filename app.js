@@ -1196,7 +1196,7 @@
   }
   function setPlayerStatus(mode,errorCode){
     var box=$('playerStatus'),spinner=box.querySelector('.load-spinner'),label=$('playerStatusText'),open=$('playerOpenYoutube');
-    if(!mode){box.hidden=true;if(open)open.hidden=true;return}
+    if(!mode||mode==='blocked'){box.hidden=true;if(open)open.hidden=true;return}
     box.hidden=false;spinner.hidden=mode!=='loading';
     if(mode==='embedBlocked'){
       label.textContent='This video cannot be played inside an embedded player.';
