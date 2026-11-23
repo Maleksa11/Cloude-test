@@ -595,7 +595,7 @@ test("Piped metadata uses regional Invidious video JSON and restores direct YouT
       assert.equal(target.searchParams.get("hl"), "en");
       assert.equal(target.searchParams.get("region"), "JO");
       return new Response(JSON.stringify({
-        storyboards: target.hostname === "inv.nadeko.net" ? [{
+        storyboards: target.hostname === "yt.chocolatemoo53.com" ? [{
           url: "/api/v1/storyboards/dQw4w9WgXcQ?width=160&height=90",
           templateUrl: "https://i.ytimg.com/sb/i1/dQw4w9WgXcQ/storyboard3_L2/M$M.jpg?sqp=abc&sigh=def",
           width:160,height:90,count:30,interval:0,storyboardWidth:5,storyboardHeight:5,storyboardCount:2
