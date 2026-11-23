@@ -288,30 +288,22 @@
     }
     drawStoryboardPreview(latest,thumb,tw);
   }
-  function startStoryboardImageLoad(entry,frame,thumb,tw,key,source,isRelay,priority){
+  function startStoryboardImageLoad(entry,frame,thumb,tw,key,source,isRelay){
     entry.src=source;
     entry.image=new Image();
-    try{entry.image.fetchPriority=priority||'low';entry.image.decoding='async'}catch(e){}
-    var image=entry.image;
-    image.onload=function(){
+    try{entry.image.fetchPriority='high';entry.image.decoding='async'}catch(e){}
+    entry.image.onload=function(){
       delete storyboardImagePreloadRetryAt[key];
-      var decoded;
-      try{decoded=typeof image.decode==='function'?image.decode():Promise.resolve()}catch(e){decoded=Promise.resolve()}
-      Promise.resolve(decoded).then(function(){
-        if(entry.image===image)finishStoryboardImageLoad(entry,frame,thumb,tw,key);
-      },function(){
-        // A decode hint must never turn a successfully loaded image into a failure.
-        if(entry.image===image)finishStoryboardImageLoad(entry,frame,thumb,tw,key);
-      });
+      finishStoryboardImageLoad(entry,frame,thumb,tw,key);
     };
-    image.onerror=function(){
+    entry.image.onerror=function(){
       if(isRelay){
         // Preserve the old direct-image fallback, but only after the privacy relay
         // has failed. Normal preview and preload requests always try same-origin first.
         var directUrl=storyboardImageDirectUrl(key,frame.videoId);
         if(directUrl&&directUrl!==source){
           entry.failed=false;
-          startStoryboardImageLoad(entry,frame,thumb,tw,key,directUrl,false,priority);
+          startStoryboardImageLoad(entry,frame,thumb,tw,key,directUrl,false);
           return;
         }
       }
@@ -322,7 +314,7 @@
         if(SB_DEBUG)setSbStage('img-fail: relay+direct');
       }
     };
-    image.src=source;
+    entry.image.src=source;
   }
   function drawStoryboardPreview(frame,thumb,tw){
     var key=frame.url;
@@ -343,14 +335,10 @@
       entry=storyboardImageCache[key]={loaded:false,failed:false,src:'',image:null,relayTried:true};
       var proxyUrl=storyboardPreviewProxyUrl(key,frame.videoId);
       if(proxyUrl&&proxyUrl!==key){
-        startStoryboardImageLoad(entry,frame,thumb,tw,key,proxyUrl,true,'high');
+        startStoryboardImageLoad(entry,frame,thumb,tw,key,proxyUrl,true);
       }else{
-        startStoryboardImageLoad(entry,frame,thumb,tw,key,key,false,'high');
+        startStoryboardImageLoad(entry,frame,thumb,tw,key,key,false);
       }
-    }else if(!entry.loaded&&entry.image){
-      // The user is now hovering this frame; promote the in-flight preload if the
-      // browser supports changing fetchPriority without starting a duplicate request.
-      try{entry.image.fetchPriority='high'}catch(e){}
     }
     if(SB_DEBUG)setSbStage(entry.failed?'img-fail':!entry.loaded?(entry.relayTried?'img-loading (relay)':'img-loading'):(entry.relayTried?'img-ok (relay)':'img-ok'));
     if(entry.failed){thumb.style.backgroundImage='none';return}
@@ -406,7 +394,7 @@
     // The image helper falls back to the old direct route only if the relay fails.
     var proxyUrl=storyboardPreviewProxyUrl(key,id);
     entry=storyboardImageCache[key]={loaded:false,failed:false,src:'',image:null,relayTried:!!(proxyUrl&&proxyUrl!==key)};
-    startStoryboardImageLoad(entry,frame,thumb,tw,key,proxyUrl&&proxyUrl!==key?proxyUrl:key,!!(proxyUrl&&proxyUrl!==key),'low');
+    startStoryboardImageLoad(entry,frame,thumb,tw,key,proxyUrl&&proxyUrl!==key?proxyUrl:key,!!(proxyUrl&&proxyUrl!==key));
     return key;
   }
   function preloadStoryboardPreview(id,seconds){

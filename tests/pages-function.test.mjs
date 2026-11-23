@@ -90,11 +90,11 @@ test("player preserves the original pointer-event interaction model", async () =
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.ok(html.includes('<div id="touch"></div>'));
   assert.ok(!html.includes('<button id="touch"'));
-  assert.ok(html.includes("style.css?v=72"));
-  assert.ok(html.includes("app.js?v=72"));
+  assert.ok(html.includes("style.css?v=71"));
+  assert.ok(html.includes("app.js?v=71"));
 
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.ok(sw.includes("malek-tube-shell-v72"));
+  assert.ok(sw.includes("malek-tube-shell-v71"));
 });
 
 test("warms storyboard sprites near the current playhead before timeline hover", async () => {
@@ -104,12 +104,8 @@ test("warms storyboard sprites near the current playhead before timeline hover",
     app.indexOf("var lastSeekPreviewEvent=null")
   );
   const imageLoader = app.slice(
-    app.indexOf("function startStoryboardImageLoad(entry,frame,thumb,tw,key,source,isRelay,priority){"),
+    app.indexOf("function startStoryboardImageLoad(entry,frame,thumb,tw,key,source,isRelay){"),
     app.indexOf("function drawStoryboardPreview(frame,thumb,tw){")
-  );
-  const drawPreview = app.slice(
-    app.indexOf("function drawStoryboardPreview(frame,thumb,tw){"),
-    app.indexOf("function storyboardPreviewProxyUrl(raw,id){")
   );
   const videoInfo = app.slice(
     app.indexOf("function loadVideoInfo(id){"),
@@ -126,10 +122,7 @@ test("warms storyboard sprites near the current playhead before timeline hover",
   assert.ok(preload.includes("if(!id||id!==currentVideoId||seekHover)return"), "only warm the active video when the timeline is not being used");
   assert.ok(!preload.includes("fetch("), "preloading must not add a new fetch path");
   assert.ok(!preload.includes("https://"), "preloading must not introduce a new external host");
-  assert.ok(imageLoader.includes("entry.image.fetchPriority=priority||'low'"), "background storyboard preloads must not compete with user-visible playback");
-  assert.ok(imageLoader.includes("image.decode()"), "wait for image decode before painting a newly loaded storyboard");
-  assert.ok(preload.includes("proxyUrl&&proxyUrl!==key?proxyUrl:key,!!(proxyUrl&&proxyUrl!==key),'low'"), "preloads use low network priority");
-  assert.ok(drawPreview.includes("entry.image.fetchPriority='high'"), "a hovered frame promotes an existing preload where the browser supports it");
+  assert.ok(imageLoader.includes("entry.image.fetchPriority='high'"), "prioritize the initial storyboard image request");
   assert.ok(imageLoader.includes("if(isRelay)"), "attempt the privacy relay before the direct fallback");
   assert.ok(imageLoader.includes("storyboardImageDirectUrl(key,frame.videoId)"), "only try the direct image after relay failure");
   assert.ok(paint.includes("preloadStoryboardPreview(currentVideoId,t)"), "keep the current playhead sheet warm as playback advances");
@@ -397,7 +390,7 @@ test("Piped suggestions are normalized to the app response shape", async () => {
     assert.equal(PIPED_TEST_HOSTS.includes(target.hostname), true);
     assert.equal(target.pathname, "/suggestions");
     assert.equal(target.searchParams.get("query"), "privacy");
-    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US;q=0.9,en;q=0.9,ar;q=0.9");
+    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US,en;q=0.9");
     return new Response(JSON.stringify(["privacy", "privacy browser"]), {
       status: 200, headers: { "Content-Type": "application/json" }
     });
@@ -411,13 +404,11 @@ test("Piped suggestions are normalized to the app response shape", async () => {
   }
 });
 
-test("English suggestions rank English first and keep German suggestions", async () => {
-  let calls = 0;
+test("English suggestions filter German suggestions", async () => {
   globalThis.fetch = async (url, init) => {
     const target = new URL(String(url));
-    calls++;
     assert.equal(target.pathname, "/suggestions");
-    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US;q=0.9,en;q=0.9,ar;q=0.9");
+    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US,en;q=0.9");
     return new Response(JSON.stringify(["Fußball spielen", "Best football goals", "Die besten Tore"]), {
       status: 200, headers: { "Content-Type": "application/json" }
     });
@@ -425,26 +416,28 @@ test("English suggestions rank English first and keep German suggestions", async
   try {
     const response = await onRequest(context("/api/v1/search/suggestions?q=football", { Origin: SITE }));
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), {
-      suggestions: ["Best football goals", "Fußball spielen", "Die besten Tore"]
-    });
-    assert.equal(calls, 1, "a healthy provider is not retried because suggestions are in another language");
+    assert.deepEqual(await response.json(), { suggestions: ["Best football goals"] });
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("English search keeps foreign results after ranking and does not retry on language mismatch", async () => {
+test("English search skips German-only providers and filters German titles", async () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.999999;
   const seen = [];
   globalThis.fetch = async (url, init) => {
     const target = new URL(String(url));
     seen.push(target.hostname);
-    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US;q=0.9,en;q=0.9,ar;q=0.9");
+    assert.equal(new Headers(init.headers).get("Accept-Language"), "en-US,en;q=0.9");
+    const isGermanOnly = target.hostname === PIPED_TEST_HOSTS[0];
+    const titles = isGermanOnly
+      ? ["Die besten Fußball Momente", "Warum ist das so?"]
+      : ["Best football moments", "How this game changed everything"];
     return new Response(JSON.stringify({
-      items: [
-        { title: "Die besten Fußball Momente", url: "/watch?v=dQw4w9WgXcQ", duration: 10 },
-        { title: "Warum ist das so?", url: "/watch?v=9bZkp7q19f0", duration: 10 }
-      ],
+      items: titles.map((title, index) => ({
+        title, url: "/watch?v=" + (index ? "9bZkp7q19f0" : "dQw4w9WgXcQ"), duration: 10
+      })),
       nextpage: "english-next-page"
     }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
@@ -455,18 +448,18 @@ test("English search keeps foreign results after ranking and does not retry on l
     ));
     const data = await response.json();
     assert.equal(response.status, 200);
-    assert.deepEqual(data.items.map((item) => item.title), [
-      "Die besten Fußball Momente",
-      "Warum ist das so?"
-    ]);
-    assert.equal(data.nextPage, "english-next-page");
-    assert.equal(seen.length, 1, "a healthy provider is not retried just because its result language differs");
+    assert.equal(data.items.length, 2);
+    assert.equal(data.items.every((item) => !/fußball|\bder\b|\bdie\b|\bdas\b|\bund\b/i.test(item.title)), true);
+    assert.equal(data.items[0].title, "Best football moments");
+    assert.equal(seen.length, 2, "a provider with no English results is followed by exactly one more");
+    assert.notEqual(seen[0], seen[1]);
   } finally {
+    Math.random = originalRandom;
     globalThis.fetch = originalFetch;
   }
 });
 
-test("Arabic search ranks Arabic first and keeps English titles", async () => {
+test("Arabic search sends Arabic preference and returns Arabic titles only", async () => {
   const seenHeaders = [];
   globalThis.fetch = async (url, init) => {
     const target = new URL(String(url));
@@ -487,10 +480,8 @@ test("Arabic search ranks Arabic first and keeps English titles", async () => {
     ));
     const data = await response.json();
     assert.equal(response.status, 200);
-    assert.deepEqual(data.items.map((item) => item.title), [
-      "أفضل أهداف كرة القدم",
-      "Best football highlights"
-    ]);
+    assert.equal(data.items.length, 1);
+    assert.equal(data.items[0].title, "أفضل أهداف كرة القدم");
     assert.equal(seenHeaders.length, 1);
     assert.equal(seenHeaders.every((value) => value === "ar,en;q=0.9"), true);
   } finally {
@@ -595,7 +586,7 @@ test("Piped metadata uses regional Invidious video JSON and restores direct YouT
       assert.equal(target.searchParams.get("hl"), "en");
       assert.equal(target.searchParams.get("region"), "JO");
       return new Response(JSON.stringify({
-        storyboards: target.hostname === "yt.chocolatemoo53.com" ? [{
+        storyboards: target.hostname === "inv.nadeko.net" ? [{
           url: "/api/v1/storyboards/dQw4w9WgXcQ?width=160&height=90",
           templateUrl: "https://i.ytimg.com/sb/i1/dQw4w9WgXcQ/storyboard3_L2/M$M.jpg?sqp=abc&sigh=def",
           width:160,height:90,count:30,interval:0,storyboardWidth:5,storyboardHeight:5,storyboardCount:2
@@ -669,7 +660,7 @@ test("uses dedicated storyboard JSON only when regional video metadata has no bo
         assert.equal(target.searchParams.get("region"), "JO");
         assert.equal(target.searchParams.has("width"), false);
         assert.equal(target.searchParams.has("height"), false);
-        const boards = target.hostname === "yt.chocolatemoo53.com" ? [{
+        const boards = target.hostname === "inv.nadeko.net" ? [{
           templateUrl: "https://i.ytimg.com/sb/i/dQw4w9WgXcQ/storyboard3_L2/M$M.jpg?sigh=fallback",
           width: 160, height: 90, count: 10, interval: 1000, storyboardWidth: 5, storyboardHeight: 2, storyboardCount: 1
         }] : [];

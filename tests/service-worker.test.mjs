@@ -32,7 +32,7 @@ async function loadWorker(network) {
     }
   };
   const self = {
-    location: { href: ORIGIN + "/sw.js?v=72", origin: ORIGIN },
+    location: { href: ORIGIN + "/sw.js?v=71", origin: ORIGIN },
     addEventListener: (type, fn) => { listeners[type] = fn; },
     skipWaiting: async () => {},
     clients: { claim: async () => {} }
@@ -76,7 +76,7 @@ test("only the app shell page is stored as the offline shell; privacy.html is no
   const worker = await loadWorker(online);
   await worker.dispatch(ORIGIN + "/", "navigate");
   const shellKey = ORIGIN + "/index.html";
-  const cache = await worker.caches.open("malek-tube-shell-v72");
+  const cache = await worker.caches.open("malek-tube-shell-v71");
   assert.equal(await (await cache.match(shellKey)).text(), "network /", "the app shell is refreshed from the network");
 
   // A visit to the privacy page must not overwrite the shell...
@@ -85,7 +85,7 @@ test("only the app shell page is stored as the offline shell; privacy.html is no
 
   // ...and offline, the app opens, while a non-shell page simply fails instead of showing the app.
   const offlineWorker = await loadWorker(offline);
-  await offlineWorker.caches.open("malek-tube-shell-v72").then((c) => c.put(shellKey, new Response("cached app shell")));
+  await offlineWorker.caches.open("malek-tube-shell-v71").then((c) => c.put(shellKey, new Response("cached app shell")));
   const app = await offlineWorker.dispatch(ORIGIN + "/", "navigate");
   assert.equal(await app.response.text(), "cached app shell");
   const privacy = await offlineWorker.dispatch(ORIGIN + "/privacy.html", "navigate");
@@ -94,15 +94,15 @@ test("only the app shell page is stored as the offline shell; privacy.html is no
 
 test("shell files are network-first with an offline fallback, regardless of the ?v= suffix", async () => {
   const worker = await loadWorker(online);
-  const fresh = await worker.dispatch(ORIGIN + "/style.css?v=72");
+  const fresh = await worker.dispatch(ORIGIN + "/style.css?v=71");
   assert.equal(await fresh.response.text(), "network /style.css", "an online request is never answered with an old copy");
 
   const offlineWorker = await loadWorker(offline);
-  const cache = await offlineWorker.caches.open("malek-tube-shell-v72");
+  const cache = await offlineWorker.caches.open("malek-tube-shell-v71");
   await cache.put(ORIGIN + "/style.css", new Response("cached css"));
-  const stale = await offlineWorker.dispatch(ORIGIN + "/style.css?v=72");
+  const stale = await offlineWorker.dispatch(ORIGIN + "/style.css?v=71");
   assert.equal(await stale.response.text(), "cached css");
-  const missing = await offlineWorker.dispatch(ORIGIN + "/app.js?v=72");
+  const missing = await offlineWorker.dispatch(ORIGIN + "/app.js?v=71");
   assert.equal(missing.response.type, "error");
 });
 
@@ -110,17 +110,16 @@ test("activating a new version deletes older shell caches and nothing else", asy
   const worker = await loadWorker(online);
   await worker.caches.open("malek-tube-shell-v70");
   await worker.caches.open("malek-tube-shell-v71");
-  await worker.caches.open("malek-tube-shell-v72");
   await worker.caches.open("unrelated-cache");
   let finished = null;
   worker.listeners.activate({ waitUntil: (promise) => { finished = promise; } });
   await finished;
-  assert.deepEqual([...worker.stores.keys()].sort(), ["malek-tube-shell-v72", "unrelated-cache"]);
+  assert.deepEqual([...worker.stores.keys()].sort(), ["malek-tube-shell-v71", "unrelated-cache"]);
 });
 
 test("the page registers exactly this worker through a Trusted Types policy", async () => {
   const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
   assert.ok(app.includes("var swUrl='sw.js?v=71'"));
-  assert.ok(sw.includes("malek-tube-shell-v72"));
+  assert.ok(sw.includes("malek-tube-shell-v71"));
 });

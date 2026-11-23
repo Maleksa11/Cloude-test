@@ -7,14 +7,6 @@ const INVIDIOUS_HOSTS = [
   "yt.chocolatemoo53.com",
   "invidious.tiekoetter.com"
 ];
-// Match the previous player's first-choice order for timeline metadata, while
-// keeping relay-only requests and the existing three-provider retry budget.
-const INVIDIOUS_PREFERRED_HOSTS = [
-  "yt.chocolatemoo53.com",
-  "invidious.tiekoetter.com",
-  "invidious.nerdvpn.de",
-  "inv.nadeko.net"
-];
 const PIPED_HOSTS = [
   "pipedapi.kavin.rocks",
   "api.piped.yt",
@@ -98,9 +90,8 @@ function shuffleHosts(hosts) {
   return shuffled;
 }
 
-function orderHosts(hosts, preferredHosts = []) {
+function orderHosts(hosts) {
   const now = Date.now();
-  const preferredRanks = new Map(preferredHosts.map((host, index) => [host, index]));
   const entries = hosts.map((host, index) => {
     const state = hostState.get(host);
     const rank = !state ? 1 : state.badUntil > now ? 2 : state.lastGoodAt ? 0 : 1;
@@ -114,17 +105,12 @@ function orderHosts(hosts, preferredHosts = []) {
     .filter((entry) => entry.rank === 0)
     .sort((a, b) => b.good - a.good || a.index - b.index)
     .map((entry) => entry.host);
-  const preferKnownOrder = (a, b) =>
-    (preferredRanks.get(a) ?? Number.MAX_SAFE_INTEGER) -
-    (preferredRanks.get(b) ?? Number.MAX_SAFE_INTEGER);
   const untested = shuffleHosts(entries
     .filter((entry) => entry.rank === 1)
-    .map((entry) => entry.host))
-    .sort(preferKnownOrder);
+    .map((entry) => entry.host));
   const coolingDown = shuffleHosts(entries
     .filter((entry) => entry.rank === 2)
-    .map((entry) => entry.host))
-    .sort(preferKnownOrder);
+    .map((entry) => entry.host));
 
   return [...knownGood, ...untested, ...coolingDown];
 }
@@ -173,7 +159,7 @@ async function hedgedRace(hosts, attempt, options = {}) {
   // attempts are refunded: dead providers cost time, not privacy.
   const budget = options.maxAttempts ?? HEDGE_MAX_ATTEMPTS;
   const deadline = Date.now() + (options.deadlineMs ?? HEDGE_DEADLINE_MS);
-  const list = orderHosts(hosts, options.preferredHosts || []);
+  const list = orderHosts(hosts);
   return new Promise((resolve) => {
     const failures = [];
     let next = 0, inFlight = 0, used = 0, done = false, timer = 0;
@@ -336,11 +322,9 @@ function safeStoryboardTarget(raw, expectedVideoId) {
 function privacyHeaders(accept, language = "en") {
   // Build fresh headers; never copy visitor IP, cookie, authorization, or referrer headers.
   // Cloudflare sends this as a Worker subrequest rather than forwarding the browser request.
-  const acceptLanguage = language === "ar" ? "ar,en;q=0.9" :
-    language === "en-ar" ? "en-US;q=0.9,en;q=0.9,ar;q=0.9" : "en-US,en;q=0.9";
   return new Headers({
     "Accept": accept,
-    "Accept-Language": acceptLanguage,
+    "Accept-Language": language === "ar" ? "ar,en;q=0.9" : "en-US,en;q=0.9",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
   });
 }
@@ -483,63 +467,6 @@ function isPreferredRecommendationText(value) {
   return isPreferredSearchText(value, "en") || isPreferredSearchText(value, "ar");
 }
 
-// Search results are ranked, never discarded, by the language evidence in the title.
-// Arabic and identifiable English titles rank first. Titles with too little evidence
-// stay neutral in the middle tier instead of being guessed from product names
-// from a product name such as "RTX 5090".
-const ENGLISH_SEARCH_WORDS = new Set(
-  "review benchmark unboxing gaming gameplay tutorial explained guide comparison best how the new official setup performance first look build pc video news update full walkthrough trailer specs price launch hands-on hands on the this these those is it worth does can should will what why which from under over vs versus compared tested latest check buying buy gpu graphics card nvidia geforce".split(" ")
-);
-const CONFIRMED_OTHER_LANGUAGE_WORDS = new Set([
-  ...NON_ENGLISH_STRONG_WORDS,
-  "leistung", "leistungen", "brutale", "praxistest", "anleitung", "bauen",
-  "kaufberatung", "vergleich", "vergleichstest", "grafikkarte", "treiber",
-  "kuhlung", "kühlung", "übertaktung", "vorstellung", "testbericht", "testberichte",
-  "leistungstest", "verbrauch", "energieverbrauch", "lautstärke", "lautstaerke",
-  "lüfter", "luefter", "temperatur", "temperaturen", "verfügbar", "verfuegbar",
-  "verfügbarkeit", "verfuegbarkeit", "empfehlung", "empfehlenswert", "günstig",
-  "guenstig", "günstiger", "guenstiger", "beste", "besten", "neue", "neuen",
-  "für", "über", "gegenüber", "gegenueber", "prueba", "reseña", "analisis",
-  "análisis", "comparativa", "recensione", "confronto", "migliore",
-  "meilleur", "meilleure", "essai"
-]);
-function languageTier(value) {
-  const text = String(value || "").normalize("NFKC").trim();
-  const letters = Array.from(text).filter((character) => /\p{L}/u.test(character));
-  if (!letters.length) return "neutral";
-
-  const arabicCount = letters.filter((character) => /\p{Script=Arabic}/u.test(character)).length;
-  if (arabicCount >= 2 && arabicCount / letters.length >= 0.2) return "preferred";
-
-  // A non-Latin, non-Arabic script is positive evidence of another language.
-  if (letters.some((character) =>
-    !/\p{Script=Latin}/u.test(character) && !/\p{Script=Arabic}/u.test(character)
-  )) return "other";
-
-  const rawWords = text.toLowerCase().match(/\p{L}+/gu) || [];
-  const normalizedWords = text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().match(/\p{L}+/gu) || [];
-  const words = new Set([...rawWords, ...normalizedWords]);
-
-  if ([...words].some((word) => CONFIRMED_OTHER_LANGUAGE_WORDS.has(word))) return "other";
-  if (/\bim\s+(?:test|vergleich|benchmark)\b|\b(?:praxistest|anleitung|kaufberatung|brutale\s+leistung)\b/i.test(text)) {
-    return "other";
-  }
-  for (const markers of NON_ENGLISH_WORDS) {
-    let score = 0;
-    for (const word of words) if (markers.has(word)) score++;
-    if (score >= 2) return "other";
-  }
-  if ([...words].some((word) => ENGLISH_SEARCH_WORDS.has(word))) return "preferred";
-  return "neutral";
-}
-function rankByLanguage(items, getTitle) {
-  return items
-    .map((item, index) => ({ item, index, tier: languageTier(getTitle(item)) }))
-    .sort((a, b) => ({ preferred: 0, neutral: 1, other: 2 })[a.tier] -
-      ({ preferred: 0, neutral: 1, other: 2 })[b.tier] || a.index - b.index)
-    .map((entry) => entry.item);
-}
-
 async function fetchPipedFromHost(host, path, language = "en") {
   try {
     return await timedFetch("https://" + host + path, {
@@ -569,16 +496,33 @@ async function fetchPipedFromHost(host, path, language = "en") {
 }
 
 // One provider at a time (see hedgedRace): the request is not broadcast.
-async function fetchPiped(path, validate, language = "en") {
+async function fetchPiped(path, validate) {
   return hedgedRace(PIPED_HOSTS, async (host) => {
-    const result = await fetchPipedFromHost(host, path, language);
+    const result = await fetchPipedFromHost(host, path);
     if (!result.ok) return result;
     if (!validate(result.data)) return { ok: false, failure: { host, status: "unexpected-data" } };
     return { ok: true, host, data: result.data };
   }, { group: "piped", maxAttempts: PIPED_MAX_ATTEMPTS });
 }
 
-
+async function fetchPipedPreferred(path, language, validate, project) {
+  let fallback = null;
+  const result = await hedgedRace(PIPED_HOSTS, async (host) => {
+    const fetched = await fetchPipedFromHost(host, path, language);
+    if (!fetched.ok) return fetched;
+    if (!validate(fetched.data)) return { ok: false, failure: { host, status: "unexpected-data" } };
+    const matches = project(fetched.data).filter((item) => isPreferredSearchText(item.text, language));
+    if (matches.length) return { ok: true, host, data: fetched.data, matches };
+    // A healthy provider that simply has no result in the requested language:
+    // remember it, but keep looking (bounded by the attempt budget) without
+    // marking the provider as broken.
+    if (!fallback) fallback = { ok: true, host, data: fetched.data, matches: [] };
+    return { ok: false, soft: true, failure: { host, status: "no-language-match" } };
+  }, { group: "piped", maxAttempts: PIPED_MAX_ATTEMPTS });
+  if (result.ok) return result;
+  if (fallback) return fallback;
+  return result;
+}
 
 function pipedSearchPath(url) {
   const params = new URLSearchParams();
@@ -592,19 +536,18 @@ function pipedSearchPath(url) {
 async function proxyPipedSearch(url) {
   const path = pipedSearchPath(url);
   const language = preferredSearchLanguage(one(url, "q"));
-  const result = await fetchPiped(
+  // Piped's public search API has no locale parameter, so enforce language on returned titles.
+  const result = await fetchPipedPreferred(
     path,
+    language,
     (data) => !!data && typeof data === "object" && !Array.isArray(data) && Array.isArray(data.items),
-    language === "ar" ? "ar" : "en-ar"
+    (data) => data.items.map(extractPipedVideo).filter(Boolean).map((video) => ({ text: video.title, value: video }))
   );
   if (!result.ok) {
     console.warn("[MTube relay] All Piped search providers failed:", result.failures);
     return jsonResponse({ error: "Video search is temporarily unavailable.", ...publicDiagnostics("providers", result.failures) }, 503);
   }
-  // Reordering is local to this provider response. Keep every valid result and pass
-  // the provider's opaque next-page cursor through unchanged.
-  const videos = result.data.items.map(extractPipedVideo).filter(Boolean);
-  const items = rankByLanguage(videos, (video) => video.title);
+  const items = result.matches.map((item) => item.value);
   const nextPage = typeof result.data.nextpage === "string" && result.data.nextpage.length <= 10000
     ? result.data.nextpage : null;
   return jsonResponse({ items, nextPage });
@@ -613,20 +556,17 @@ async function proxyPipedSearch(url) {
 async function proxyPipedSuggestions(query) {
   const params = new URLSearchParams({ query });
   const language = preferredSearchLanguage(query);
-  const result = await fetchPiped(
+  const result = await fetchPipedPreferred(
     "/suggestions?" + params.toString(),
+    language,
     Array.isArray,
-    language === "ar" ? "ar" : "en-ar"
+    (data) => data.filter((item) => typeof item === "string").map((value) => ({ text: value, value }))
   );
   if (!result.ok) {
     console.warn("[MTube relay] All Piped suggestion providers failed:", result.failures);
     return jsonResponse({ error: "Search suggestions are temporarily unavailable.", ...publicDiagnostics("providers", result.failures) }, 503);
   }
-  const suggestions = rankByLanguage(
-    result.data.filter((item) => typeof item === "string"),
-    (value) => value
-  ).slice(0, 12);
-  return jsonResponse({ suggestions });
+  return jsonResponse({ suggestions: result.matches.map((item) => item.value).slice(0, 12) });
 }
 
 
@@ -838,7 +778,7 @@ async function proxyStoryboardVtt(videoId, width, height, region = "JO") {
     } catch (error) {
       return { ok: false, failure: { host, status: 0, reason: storyboardFailureReason(error) } };
     }
-  }, { group: "invidious", preferredHosts: INVIDIOUS_PREFERRED_HOSTS });
+  }, { group: "invidious" });
   if (result.ok) return jsonResponse(result.cues);
   console.warn("[MTube relay] Storyboard VTT unavailable for", videoId, result.failures);
   return jsonResponse({
@@ -865,7 +805,7 @@ async function fetchStoryboardFromInvidious(videoId, path, diag) {
       return { ok: false, soft: true, failure: { host, status: "no-storyboards" } };
     }
     return { ok: true, boards };
-  }, { group: "invidious", maxAttempts: 3, preferredHosts: INVIDIOUS_PREFERRED_HOSTS });
+  }, { group: "invidious", maxAttempts: 3 });
   return result.ok ? result.boards : [];
 }
 
