@@ -669,7 +669,7 @@ test("uses dedicated storyboard JSON only when regional video metadata has no bo
         assert.equal(target.searchParams.get("region"), "JO");
         assert.equal(target.searchParams.has("width"), false);
         assert.equal(target.searchParams.has("height"), false);
-        const boards = target.hostname === "inv.nadeko.net" ? [{
+        const boards = target.hostname === "yt.chocolatemoo53.com" ? [{
           templateUrl: "https://i.ytimg.com/sb/i/dQw4w9WgXcQ/storyboard3_L2/M$M.jpg?sigh=fallback",
           width: 160, height: 90, count: 10, interval: 1000, storyboardWidth: 5, storyboardHeight: 2, storyboardCount: 1
         }] : [];
